@@ -1,0 +1,21 @@
+python -m open_source_i_n^
+ --duration 0.1^
+ --sim_block_size 0.1^
+ --save_data^
+ --gs "43.6532, -79.3832"^
+ --freq_dl 12.0^
+ --freq_ul 14.25^
+ --vic_tle_file "TLEs/TLES_Kepler.txt"^
+ --vic_min_el 10^
+ --vic_geo_angle 20^
+ --vic_tracking_strat "Random"^
+ --vic_module "template_standard"^
+ --vic_const_name "Kepler"^
+ --inter_tle_file "TLEs/TLES_Kepler_rogue_sat.txt"^
+ --inter_min_el 10^
+ --inter_geo_angle 20^
+ --inter_tracking_strat "Longest Hold"^
+ --inter_module "template_custom"^
+ --inter_const_name "Kepler"^
+ --parallel 0^
+ --name "test_example"
