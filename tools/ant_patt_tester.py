@@ -117,6 +117,7 @@ def plot_patt_list_2d(ant_patt_list, normalize=False):
     'A': Parameters are (gain, diameter, off-axis angle, frequency)
     'B': Parameters are (gain, diameter, off-axis angle, frequency, half power half beam width)
     'C': Parameters are (diameter, off-axis angle, frequency)
+    'D': Parameters are (gain, off-axis angle)
 
     Args:
         ant_patt_list: List of two-member dictionaries as follows:
@@ -204,8 +205,8 @@ def plot_kosia_antenna_file(plt_ax_tx,
     The following are permitted:
         - 'sweep': Feeds an array from 90 to 0 to 90 into the corresponding antenna function
         - 'pointed': Feeds an array of zeros into the corresponding antenna function
-    This option is provided to help visualize what a pattern would look like if an antenna is
-    normally pointed, is instead positioned nadir, and vice versa.
+    This option is provided to help visualize what a pattern would look like if an antenna that
+    is normally pointed, is instead positioned nadir, and vice versa.
 
     Example: If you have a satellite TX antenna that is normally modelled as pointed to a ground
     station, you can specify sep_mode_ss='pointed' and/or nad_mode_ss='pointed' (depending on
@@ -381,3 +382,5 @@ if __name__ == '__main__':
     axes[0].grid()
     axes[1].grid()
     axes[2].grid()
+    plt.show()
+

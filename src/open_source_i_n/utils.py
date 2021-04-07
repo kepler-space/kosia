@@ -2,13 +2,15 @@ from time import monotonic
 from pathlib import Path
 from os import getcwd, scandir, mkdir
 from re import search
-from sys import stderr
+from sys import stderr, gettrace
 import tkinter
 from tkinter import filedialog
 
-root_path_src = Path.cwd()
-# FIXME: If running in an IDE, change this to Path.cwd().parent.parent. If running from a
-#  terminal (and after having run pip3 install -e .[open_source_i_n]), then just use Path.cwd()
+# If running in an IDE, this should be Path.cwd().parent.parent. Otherwise, Path.cwd().
+if gettrace() is None:
+    root_path_src = Path.cwd()
+else:
+    root_path_src = Path.cwd().parent.parent
 
 
 # File IO Functions

@@ -176,7 +176,7 @@ Contains several tools designed to plot (and validate) antenna patterns.
 You must edit ant_patt_tester.py directly to select your antenna pattern in either of the following cases:
 
 ##### Validating standard antenna patterns
-Has scripts to plot off-axis patterns in 2D or 3D (see implementation of plot_2d() and plot_3d()). 
+Has scripts to plot off-axis patterns in 2D or 3D (see implementation of plot_patt_list_2d() and plot_func_as_colormap()). 
 
 ##### Validating whole KOSIA antenna pattern .py files
 Also has a script that reads an entire KOSIA antenna python file directly (see plot_antenna_file()).
@@ -187,10 +187,6 @@ The tests are run by simply calling `pytest` in the root directory. Developer ex
 ```bash
 pytest
 ```
-
-
-## Considerations
-- If running the program through the internal runtime environment of an IDE (i.e. not through a terminal or command prompt window), you may need to change the root_src_path in utils.py.
 
 
 ## Known Limitations

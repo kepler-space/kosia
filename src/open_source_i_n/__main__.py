@@ -138,8 +138,8 @@ def _save_results(constels, sim_days, data, cdf, bins_plt, mode_tag, sim_name):
         data (VicInterPair(T, T)): T is [dB of interference for timestep].
         cdf: CDF data.
         bins_plt: Bins for CDF data.
-        mode_tag:
-        sim_name:
+        mode_tag: Specification of dataset type (I/N, C/N, C/I, C/I+N)
+        sim_name: User name for simulation
 
     Returns:
 

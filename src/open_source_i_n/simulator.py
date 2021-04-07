@@ -448,7 +448,7 @@ class InterferenceSim:
         timescale = load.timescale(builtin=True)
 
         # Divide interval further into partitions, one for each processor to be used.
-        if self.parallelism < 0:  # Negative parallelism is interpreted
+        if self.parallelism < 0:  # Negative parallelism is interpreted as serial processing.
             intervals = list(partition_interval_chunks(*interval, 1, interval.step))
         else:
             intervals = list(partition_interval_chunks(*interval, self._parallelism, interval.step))

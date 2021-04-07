@@ -174,7 +174,6 @@ class Config:
         inter_module
         inter_const_name
         parallel *
-        mode *
         name *
 
     * = Optional
@@ -225,11 +224,6 @@ class Config:
                 self.parallel = 0
 
             try:
-                self.mode = args['mode']
-            except KeyError:
-                self.mode = 'c_i_n'
-
-            try:
                 self.name = args['name']
             except KeyError:
                 self.name = ""
@@ -266,10 +260,6 @@ class Config:
                 self.parallel = args['parallel']
             else:
                 self.parallel = 0
-            if args['mode']:
-                self.mode = args['mode']
-            else:
-                self.mode = 'c_i_n'
             if args['name']:
                 self.name = args['name']
             else:
@@ -323,7 +313,6 @@ class Config:
             f'{start_char}--inter_module "{self.inter_module.__name__.split(".")[-1]}"{end_char}' \
             f'{start_char}--inter_const_name "{self.inter_const_name}"{end_char}' \
             f'{start_char}--parallel {self.parallel}{end_char}' \
-            f'{start_char}--mode "{self.mode}"{end_char}' \
             f'{start_char}--name "{self.name}"'
 
         with open(f"{folder_name}{self.name}{file_type}", 'w') as f:
