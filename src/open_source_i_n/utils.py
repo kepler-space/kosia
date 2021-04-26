@@ -53,8 +53,7 @@ def open_file_dialog(init_folder=None, file_types=None, plural=False):
             return filedialog.askopenfilenames(parent=root,
                                                initialdir=init_folder,
                                                filetypes=file_types)
-        else:
-            return filedialog.askopenfilenames(parent=root,
+        return filedialog.askopenfilenames(parent=root,
                                                initialdir=init_folder,
                                                filetypes=file_types)[0]
     except IndexError:
@@ -83,9 +82,8 @@ def open_folder_dialog(init_folder=None):
                                               title="Select folder")
     if folder_selected != "":
         return folder_selected
-    else:
-        print("No folder selected.")
-        return ""
+    print("No folder selected.")
+    return ""
 
 
 def check_folder(path):
@@ -117,10 +115,10 @@ def read_config_file(file_name):
     """
     # Reads the config.ini to parse the program settings.
     file_path = root_path_src / file_name
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r') as file:
         dic = {
             search("\<(.*?)\>", i).group().strip("<>"): "".join(i.split()[1:])   # pylint: disable=anomalous-backslash-in-string
-            for i in f.readlines() if i.startswith("<")
+            for i in file.readlines() if i.startswith("<")
         }
     return dic
 
@@ -152,9 +150,8 @@ def get_setting(settings_dict, key, accepted_vals=None, is_boolean=False, option
     except KeyError():
         if optional:
             return None
-        else:
-            print(f"No {key} specified. Please specify an {key} in settings.ini")
-            return None
+        print(f"No {key} specified. Please specify an {key} in settings.ini")
+        return None
 
     # If accepted values are specified, use them to validate input.
     if accepted_vals:
@@ -162,14 +159,12 @@ def get_setting(settings_dict, key, accepted_vals=None, is_boolean=False, option
             print(f"Error: {key} '{output}' not recognized. Accepted values are {accepted_vals}",
                   file=stderr)
             return None
-        elif is_boolean:
+        if is_boolean:
             return __str_to_boolean(output)
-        else:
-            return output
-    elif is_boolean:
-        return __str_to_boolean(output)
-    else:
         return output
+    if is_boolean:
+        return __str_to_boolean(output)
+    return output
 
 
 # Performance functions

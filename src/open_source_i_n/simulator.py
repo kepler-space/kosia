@@ -4,6 +4,7 @@ import datetime
 from functools import wraps
 from itertools import chain, repeat
 import os
+from collections import namedtuple
 from numpy import arange, array, log10, pi, repeat as np_repeat, dstack, empty
 import scipy.constants as consts
 
@@ -13,6 +14,8 @@ import itur
 from .interval import partition_interval_chunks
 from .satellite import Constellation, UlDlPair, VicInterPair, longest_hold
 from .antenna import BaseAntennaModel as Bam
+
+SimGeometry = namedtuple('SimGeometry', 'sep_ang elev nad_ang zen_ang fixed_ang dist')
 
 
 def _timed_calc_interval(time_per_step):        # pylint: disable=unused-argument
@@ -93,12 +96,43 @@ class InterferenceSim:
 
         # Geometry Variables
         groundstation = Topos(*self._position)
-        vic_to_grd = (tracked.vic - groundstation).at(t_curr)  # Vector from vic to ground.
+        vic_to_grd = vic_diff[coords.vic['idx'].item()].at(t_curr)  # Vector from vic to ground.
         inter_to_grd = (tracked.inter - groundstation).at(t_curr)  # Vector from inter to ground.
         sep_angle = vic_to_grd.separation_from(inter_to_grd).degrees  # Angle between sats.
-        vic_curr = tracked.vic.at(t_curr)  # Victim satellite positions.
-        vic_diff_curr = vic_diff[coords.vic['idx'].item()].at(t_curr)
-        nad_ang = vic_diff_curr.separation_from(vic_curr).degrees  # Angle to nadir in radians.
+        vic_curr = tracked.vic.at(t_curr)  # Victim satellite position.
+        inter_curr = tracked.inter.at(t_curr)  # Interferer satellite position.
+        vic_nad_ang = vic_to_grd.separation_from(vic_curr).degrees  # Angle to nadir in radians.
+        # Angle to nadir in radians.
+        inter_nad_ang = inter_to_grd.separation_from(inter_curr).degrees
+        zenith_point = groundstation.at(t_curr).from_altaz(alt_degrees=90., az_degrees=0.)
+        vic_zen_ang = zenith_point.separation_from(vic_to_grd).degrees
+        inter_zen_ang = zenith_point.separation_from(inter_to_grd).degrees
+
+        # If Victim ES is to be kept at a fixed azimuth/elevation, define that vector.
+        if self.constellations.vic.fixed_params:
+            fixed_el, fixed_az = self.constellations.vic.fixed_params
+            fixed_point = groundstation.at(t_curr).from_altaz(alt_degrees=fixed_el,
+                                                              az_degrees=fixed_az)
+            vic_fixed_ang = fixed_point.separation_from(vic_to_grd).degrees
+            inter_fixed_ang = fixed_point.separation_from(inter_to_grd).degrees
+        else:
+            vic_fixed_ang = 0
+            inter_fixed_ang = 0
+
+            sim_geom = {'vic': SimGeometry(sep_angle,
+                                   coords.vic['el'].item(),
+                                   vic_nad_ang,
+                                   vic_zen_ang,
+                                   vic_fixed_ang,
+                                   coords.vic['r'].item()),
+                        'inter': SimGeometry(sep_angle,
+                                   coords.inter['el'].item(),
+                                   inter_nad_ang,
+                                   inter_zen_ang,
+                                   inter_fixed_ang,
+                                   coords.inter['r'].item())
+                        }
+
 
         # Other variables
         adj_factor = 0  # ITU-R BO.1696 Section 2.2.2, Z1
@@ -106,34 +140,29 @@ class InterferenceSim:
 
         # Interfering PFD in dBW/Hz for DL and UL.
         psd = array((
-            self._inter.antenna_model.ul.es_psd(
-                coords.inter['el'].item(), sep_angle, nad_ang,
-                coords.vic['r'].item()),  # Interfering ES PSD into victim sat
-            self._inter.antenna_model.dl.sat_psd(
-                coords.inter['el'].item(), sep_angle, nad_ang,
-                coords.inter['r'].item()),  # Interfering satellite PSD to co-located ES's
-            self._victim.antenna_model.ul.es_psd(
-                coords.vic['el'].item(), sep_angle, nad_ang,
-                coords.vic['r'].item()),  # Carrier ES PSD to into vic (carrier) sat
-            self._victim.antenna_model.dl.sat_psd(
-                coords.vic['el'].item(), sep_angle, nad_ang,
-                coords.vic['r'].item())))  # Carrier satellite PSD to co-located ES's
+					 # Interfering ES PSD into victim sat
+        			 self._inter.antenna_model.ul.es_psd(sim_geom),
+					 # Interfering satellite PSD to co-located ES's
+            		 self._inter.antenna_model.dl.sat_psd(sim_geom),
+					# Carrier ES PSD to into vic (carrier) sat
+            		self._victim.antenna_model.ul.es_psd(sim_geom),
+					# Carrier satellite PSD to co-located ES's
+            		self._victim.antenna_model.dl.sat_psd(sim_geom)
+				  ))
+
+
 
         # G/T off axis for victim ground station and satellite, respectively.
         g_t = array((
-            self._victim.antenna_model.ul.sat_g_over_t(
-                coords.inter['el'].item(), sep_angle, nad_ang, coords.vic['r'].item()
-            ),  # Victim satellite G/T towards interfering ES signal.
-            self._victim.antenna_model.dl.es_g_over_t(
-                coords.inter['el'].item(), sep_angle,
-                nad_ang, coords.inter['r'].item()
-            ),  # Victim ES G/T towards interfering satellite signal.
-            self._victim.antenna_model.ul.sat_g_over_t(
-                coords.vic['el'].item(), sep_angle, nad_ang, coords.vic['r'].item()
-            ),  # Victim satellite G/T towards carrier ES signal.
-            self._victim.antenna_model.dl.es_g_over_t(coords.vic['el'].item(), sep_angle, nad_ang,
-                                                      coords.vic['r'].item())
-        ))  # Victim ES G/T towards carrier satellite signal.
+					 # Victim satellite G/T towards interfering ES signal.
+            		 self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'inter'),
+					 # Victim ES G/T towards interfering satellite signal.
+            		 self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'inter'),
+					 # Victim satellite G/T towards carrier ES signal.
+            		 self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'vic'),
+					 # Victim ES G/T towards carrier satellite signal.
+            		 self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'vic')
+        		   ))
 
         # Rain fade
         inter_atmo_loss_dl = 0
@@ -217,6 +246,7 @@ class InterferenceSim:
             int_gain_ul = inter_props.es_gain_ul
             int_eirp_ul = int_gain_ul + inter_props.es_power_db
             int_dist_ul = coords.vic['r'].item()
+            # pylint: disable=fixme
             # Todo: Because earth stations are assumed to be co-located, the same 'coords' object
             #  is used to calculate distance for both carrier and interferer uplinks. Both links
             #  travel the same distance to the victim antenna. This will change with
@@ -233,6 +263,7 @@ class InterferenceSim:
             car_gain_dl = vic_props.sat_gain_dl
             car_eirp_dl = car_gain_dl + vic_props.sat_power_db
             car_dist_dl = coords.vic['r'].item()
+            # pylint: disable=fixme
             # Todo: Because earth stations are assumed to be co-located, the same 'coords' object
             #  is used to calculate distance for both carrier and interferer uplinks. Both links
             #  travel the same distance to the victim antenna. This will change with
@@ -258,7 +289,7 @@ class InterferenceSim:
                 # General
                 'Time (UTC)': t_curr.utc_strftime('%b %d %H:%M:%S'),
                 'Sep. Angle': sep_angle,
-                'Nad. Angle': nad_ang,
+                'Nad. Angle': vic_nad_ang,
                 'Rcvd. Freq.': self._frequency.ul,
                 'Rcvr. Gain': vic_props.sat_gain_ul,
                 'Tequiv': vic_props.sat_temp_sys,
@@ -308,7 +339,7 @@ class InterferenceSim:
                 # General
                 'Time (UTC)': t_curr.utc_strftime('%b %d %H:%M:%S'),
                 'Sep. Angle': sep_angle,
-                'Nad. Angle': nad_ang,
+                'Nad. Angle': vic_nad_ang,
                 'Rcvd. Freq.': self._frequency.dl,
                 'Rcvr. Gain': vic_props.es_gain_dl,
                 'Tequiv': vic_props.es_temp_sys,
@@ -397,7 +428,7 @@ class InterferenceSim:
             map(self._calculate_interference, times, [VicInterPair(*tup) for tup in zip(*tracked)],
                 [VicInterPair(*tup) for tup in zip(*sat_coords)], repeat(sat_gs_diffs.vic)))
 
-        """             
+        """
         Create a 3D array. Output type x UlDlPair x Timestep.
         Output type: i_n, c_i_n, c_i, c_n
         UlDlPair: Ul i_n, DL i_n
@@ -431,8 +462,7 @@ class InterferenceSim:
                 out = [dstack(block), budget_pair]
 
                 return out
-            else:
-                return [empty((4, 2, 0)), UlDlPair([], [])]
+            return [empty((4, 2, 0)), UlDlPair([], [])]
         return dstack(tuple(calc_list))
 
     @_timed_calc_interval(time_per_step=0.33)
@@ -496,5 +526,4 @@ class InterferenceSim:
                 budget = res[1]
                 out.append([data, budget])
             return out
-        else:
-            return dstack(list(results))
+        return dstack(list(results))

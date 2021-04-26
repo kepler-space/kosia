@@ -95,19 +95,19 @@ class AntennaModel(BaseAntennaModel):
 
     props = AntennaProperties(**__SAT_PROPERTIES[default_sat], **__ES_PROPERTIES[default_es])
 
-    def interfering_sat_dl_psd(self, elevation, sep_angle, nad_angle, dist):
+    def interfering_sat_dl_psd(self, sim_geom):
         """Constant EIRP throughout pass. This implies the interfering downlink antenna is pointed
         at the victim ground station."""
         eirp_hz = self.props.sat_eirp - 10 * log10(self.props.sat_bw_hz_dl)
 
         # Return the Received PSD in dBW/Hz/m^2
-        return eirp_hz + self.spr_loss(dist)
+        return eirp_hz + self.spr_loss(sim_geom['inter'].dist)
 
-    def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):
+    def interfering_es_ul_psd(self, sim_geom):
         """This antenna pattern will only use the peak gain. Sep angle and nadir angle are
         ignored. This allows us to model the antenna (in this case, the satellite downlink
         antenna) so as to be pointed directly into the victim earth station at all times."""
-        if elevation <= 40.0:
+        if sim_geom['inter'].elev <= 40.0:
             # These are set so they can be written properly later to the link budget output.
             self.props.es_gain_ul = 32.0
             self.props.es_eirp = -39.7 + (10 * log10(self.props.es_bw_hz_ul))
@@ -125,15 +125,15 @@ class AntennaModel(BaseAntennaModel):
             eirp_ul_hz = -42
 
         # Calculate Received PSD in dBW/Hz/m^2 at victim ground station
-        return eirp_ul_hz + self.spr_loss(dist)
+        return eirp_ul_hz + self.spr_loss(sim_geom['vic'].dist)
 
     # A standard antenna pattern (Appendix 8) is used for the victim earth station receive pattern.
     victim_es_dl_g_over_t = BaseAntennaModel.victim_es_dl_g_over_t_app8(
         props.es_gain_dl, props.es_diam_dl, props.es_temp_sys)
 
-    def victim_sat_ul_g_over_t(self, elevation, sep_angle, nad_angle, dist):
+    def victim_sat_ul_g_over_t(self, sim_geom):
         """Implement a cosine^1.35 scan loss on the satellite receive antenna."""
-        scan_loss = power(cos(deg2rad(nad_angle)), 1.35)
+        scan_loss = power(cos(deg2rad(sim_geom['vic'].nad_ang)), 1.35)
         scan_loss_bottom = 10 * log10(
             0.0042316
         )  # There's a drop to infinity at nad_angle=90, so the min is set to cos(89)^1.35

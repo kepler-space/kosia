@@ -263,7 +263,7 @@ def main(args):
 
     # Parse the raw data into UlDlPair(s). Filter out any null timesteps.
     outputs = [UlDlPair([], []) for i in range(master_block.shape[0])]
-    for i in range(len(outputs)):
+    for i, _ in enumerate(outputs):
         outputs[i].ul = master_block[i, 0, :][master_block[i, 0, :] != 0]
         outputs[i].dl = master_block[i, 1, :][master_block[i, 1, :] != 0]
 
@@ -345,9 +345,15 @@ def get_arg_parser():
                         help="Victim constellation name (for graphs).",
                         required=True)
     parser.add_argument('--vic_opt_args', help="Optional victim antenna parameters.")
+    parser.add_argument("--vic_fixed_params",
+                        type=lambda x: tuple(map(float, x.split(','))),
+                        help="If the victim antenna will be 'stuck' in a given pointing direction, "
+                             "please specify the elevation and azimuth in degrees, separated by "
+                             "a comma (e.g. '30,145').",
+                        default="")
     parser.add_argument("--inter_tle_file",
-                        help="TLE filename for the interfering constellation.",
                         type=relative_path,
+                        help="TLE filename for the interfering constellation.",
                         required=True)
     parser.add_argument("--inter_min_el",
                         type=float,
@@ -426,9 +432,9 @@ def run_batch_list(path):
                 print(ex.args)
                 log_path = file_path.__str__().rstrip(file_ext) + ' ERROR MESSAGE.txt'
 
-                with open(log_path, 'w') as f:
-                    f.writelines(ex.args)
-                f.close()
+                with open(log_path, 'w') as log_file:
+                    log_file.writelines(ex.args)
+                log_file.close()
         else:
             if linux_mode == 'shell':
                 cfg = config.load_shell(file_path)

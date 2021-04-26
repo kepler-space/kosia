@@ -22,7 +22,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     """The base class for implementing Antenna models."""
 
     name = "base"
-
+    # pylint: disable=unused-argument
     def __init__(self, frequency, opt_args=None):
         self._frequency = frequency
 
@@ -51,23 +51,27 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     frequency = property(lambda self: self._frequency)
 
     @abstractmethod
-    def interfering_sat_dl_psd(self, elevation, sep_angle, nad_angle, dist):
+    def interfering_sat_dl_psd(self, sim_geom):
         """Interfering satellite downlink PSD abstract method"""
+        # pylint: disable=unnecessary-pass
         pass
 
     @abstractmethod
-    def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):
+    def interfering_es_ul_psd(self, sim_geom):
         """Interfering earth station uplink PSD abstract method"""
+        # pylint: disable=unnecessary-pass
         pass
 
     @abstractmethod
-    def victim_es_dl_g_over_t(self, elevation, sep_angle, nad_angle, dist):
+    def victim_es_dl_g_over_t(self, sim_geom, mode):
         """Victim earth station downlink G/T abstract method"""
+        # pylint: disable=unnecessary-pass
         pass
 
     @abstractmethod
-    def victim_sat_ul_g_over_t(self, elevation, sep_angle, nad_angle, dist):
+    def victim_sat_ul_g_over_t(self, sim_geom, mode):
         """Victim satellite uplink G/T abstract method"""
+        # pylint: disable=unnecessary-pass
         pass
 
     # Calculations
@@ -103,7 +107,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         Returns:
             function: The satellite's PSD function with values.
         """
-        def interfering_sat_dl_psd(elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_sat_dl_psd(sim_geom):  # pylint: disable=unused-argument
             """Implementation of the default victim satellite downlink PSD,
                 adjusted to be in dBW/Hz.
 
@@ -119,11 +123,9 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                 float: Satellite PSD at earth station in dBW/Hz
                        (adjusted over entire transmit bandwidth).
             """
-            if pointing:
-                sep_angle = 0
 
             # elevation in degrees
-            if elevation > high_el_boundary:
+            if sim_geom['inter'].elev > high_el_boundary:
                 return low_el_pfd_hz
             return high_el_pfd_hz
 
@@ -139,7 +141,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                      pointing=False):
         """Standard pattern S.1528, as applied to calculate interfering satellite downlink PSD."""
 
-        def interfering_sat_dl_psd(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -149,7 +152,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                 L_N=L_N) + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
-            return eirp_hz + self.freespace_loss(dist, self.frequency.dl)
+            return eirp_hz + self.freespace_loss(sim_geom['inter'].dist, self.frequency.dl)
 
         return interfering_sat_dl_psd
 
@@ -157,7 +160,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     def interfering_es_ul_psd_app8(gain_es_ul, diam_es, power_db, bw_hz, pointing=False):
         """Standard Appendix 8 pattern, as applied to calculate interfering satellite uplink PSD."""
 
-        def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -166,7 +170,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                         self.frequency.ul) + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
-            return eirp_hz + self.freespace_loss(dist, self.frequency.ul)
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
 
         return interfering_es_ul_psd
 
@@ -174,7 +178,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     def interfering_es_ul_psd_s580_6(gain_es_ul, power_db, bw_hz, pointing=False):
         """Standard pattern S.580-6, as applied to calculate interfering ES uplink PSD."""
 
-        def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -183,7 +188,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                 + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
-            return eirp_hz + self.freespace_loss(dist, self.frequency.ul)
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
 
         return interfering_es_ul_psd
 
@@ -191,7 +196,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     def interfering_es_ul_psd_s1428(gain_es_ul, diam_es, power_db, bw_hz, pointing=False):
         """Standard pattern S.1428, as applied to calculate interfering ES uplink PSD."""
 
-        def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -210,7 +216,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                          self.frequency.ul) + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
-            return eirp_hz + self.freespace_loss(dist, self.frequency.ul)
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
 
         return interfering_es_ul_psd
 
@@ -227,7 +233,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         # print("Warning: Rec. 1528 is being used as an earth station pattern, but is only "
         #       "recommended for use as a satellite pattern.", file=stderr)
 
-        def interfering_es_ul_psd(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -237,7 +244,7 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                 L_N=L_N) + es_power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
-            return eirp_hz + self.freespace_loss(dist, self.frequency.ul)
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
 
         return interfering_es_ul_psd
 
@@ -253,11 +260,12 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                      use_nad_ang=False):
         """Standard pattern S.1528, as applied to calculate victim satellite uplink G/T."""
 
-        def victim_sat_ul_gain(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
             if use_nad_ang:
-                sep_angle = nad_angle
+                sep_angle = sim_geom['vic'].nad_ang
 
             # Return G/T
             return self.gain_s1528_sat(gain_sat_ul, diam, sep_angle, self.frequency.ul, hpbw,
@@ -273,7 +281,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                    pointing=False):
         """Standard Appendix 8 pattern, as applied to calculate victim ES downlink G/T."""
 
-        def victim_es_dl_gain(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -291,7 +300,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                      pointing=False):
         """Standard pattern S.580-6, as applied to calculate victim ES downlink G/T."""
 
-        def victim_es_dl_gain(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -309,7 +319,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                     pointing=False):
         """Standard pattern S.1428, as applied to calculate victim ES downlink G/T."""
 
-        def victim_es_dl_gain(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def victim_es_dl_gain(self, esim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -343,7 +354,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         # print("Warning: Rec. 1528 is being used as an earth station pattern, but is only "
         #       "recommended for use as a satellite pattern.", file=stderr)
 
-        def victim_es_dl_gain(self, elevation, sep_angle, nad_angle, dist):  # pylint: disable=unused-argument
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
             if pointing:
                 sep_angle = 0
 
@@ -614,7 +626,6 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                 –25     2.58*np.sqrt(1 − 0.6 log(z))    6.32    1.5
                 –30     2.58*np.sqrt(1 − 0.4 log(z))    6.32    1.5
         """
-        D_lambda = diam / (consts.c / freq_hz)
         G_m = gain_sat  # maximum gain in the main lobe (dBi)
         z = 1  # (major axis/minor axis) for the radiated beam
         L_F = 0  # 0 dBi far-out side-lobe level (dBi)

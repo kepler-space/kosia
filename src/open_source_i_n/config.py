@@ -38,7 +38,7 @@ def load_argv_list(argv):
 def load_from_args(args):
     """Generate a Config object directly from an ArgumentParser NameSpace object (received
     through the command line). """
-    args_dict = {i: k for i, k in args._get_kwargs()}
+    args_dict = dict(args._get_kwargs())
 
     # Since __main__.get_arg_parser() already does all the proper conversions, we pass the
     # dictionary into Config with direct=True (prevents inputs from being converted twice).
@@ -57,11 +57,11 @@ def load_batch(bat_path):
 
     """
     # LOAD BATCH FILE
-    with open(bat_path, 'r') as f:
-        lines = f.readlines()
+    with open(bat_path, 'r') as bat_file:
+        lines = bat_file.readlines()
 
     # Clean lines
-    for i in range(len(lines)):
+    for i, _ in enumerate(lines):
         lines[i] = lines[i].strip("\n").strip("^").strip(" \\")
 
     # Create dictionary
@@ -93,11 +93,11 @@ def load_shell(sh_path):
 
     """
     # LOAD SHELL FILE
-    with open(sh_path, 'r') as f:
-        lines = f.readlines()
+    with open(sh_path, 'r') as sh_file:
+        lines = sh_file.readlines()
 
     # Clean lines
-    for i in range(len(lines)):
+    for i, _ in enumerate(lines):
         lines[i] = lines[i].strip("\n").strip("\\")
 
     # Create dictionary
@@ -129,13 +129,13 @@ def open_file_simdata(file):
     """
 
     print("Opening: ", file.split("\\")[-1])
-    with open(file, "rb") as f:
+    with open(file, "rb") as sim_file:
         print("Loading data...")
-        i_n_data = load(f, allow_pickle=True)
-        percents_inst = load(f, allow_pickle=True)
-        bins_inst = load(f, allow_pickle=True)
-        argv = load(f, allow_pickle=True)
-        props = load(f, allow_pickle=True)
+        i_n_data = load(sim_file, allow_pickle=True)
+        percents_inst = load(sim_file, allow_pickle=True)
+        bins_inst = load(sim_file, allow_pickle=True)
+        argv = load(sim_file, allow_pickle=True)
+        props = load(sim_file, allow_pickle=True)
     return {
         'I_N_data': i_n_data,
         "percents_inst": percents_inst,
@@ -199,6 +199,7 @@ class Config:
             self.granularity = 1
             self.save_data = args['save_data']
             self.no_save_data = None
+            # pylint: disable=C0103
             self.gs = geometry.LatLon.from_string(args['gs'])
             self.freq_dl = float(args['freq_dl']) * 1e9
             self.freq_ul = float(args['freq_ul']) * 1e9
@@ -219,9 +220,16 @@ class Config:
             self.inter_opt_args = None
 
             try:
+                self.vic_fixed_params = tuple(map(float, args['vic_fixed_params'].split(',')))
+            except KeyError:
+                self.vic_fixed_params = ""
+
+            try:
                 self.parallel = int(args['parallel'])
             except KeyError:
                 self.parallel = 0
+
+
 
             try:
                 self.name = args['name']
@@ -255,6 +263,11 @@ class Config:
             self.inter_module = args['inter_module']
             self.inter_const_name = args['inter_const_name']
             self.inter_opt_args = args['inter_opt_args']
+
+            try:
+                self.vic_fixed_params = args['vic_fixed_params']
+            except KeyError:
+                self.vic_fixed_params = ""
 
             if args['parallel']:
                 self.parallel = args['parallel']
@@ -306,6 +319,7 @@ class Config:
             f'{start_char}--vic_tracking_strat "{self.vic_tracking_strat.value}"{end_char}' \
             f'{start_char}--vic_module "{self.vic_module.__name__.split(".")[-1]}"{end_char}' \
             f'{start_char}--vic_const_name "{self.vic_module.AntennaModel.name}"{end_char}' \
+            f'{start_char}--vic_fixed_params "{self.vic_fixed_params}"{end_char}' \
             f'{start_char}--inter_tle_file "{self.inter_tle_file}"{end_char}' \
             f'{start_char}--inter_min_el {int(self.inter_min_el)}{end_char}' \
             f'{start_char}--inter_geo_angle {int(self.inter_geo_angle)}{end_char}' \
@@ -315,5 +329,5 @@ class Config:
             f'{start_char}--parallel {self.parallel}{end_char}' \
             f'{start_char}--name "{self.name}"'
 
-        with open(f"{folder_name}{self.name}{file_type}", 'w') as f:
-            f.writelines(text)
+        with open(f"{folder_name}{self.name}{file_type}", 'w') as file:
+            file.writelines(text)

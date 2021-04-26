@@ -140,6 +140,7 @@ class Constellation:
     """Satellite constellation."""
     class TrackingStrategy(Enum):
         """Strategy for tracking satellites."""
+        # pylint: disable=fixme
         # TODO(kepler): Use i18n instead of string values.
         RANDOM = 'Random'
         HIGHEST_ELEVATION = 'Highest Elevation'
@@ -154,6 +155,7 @@ class Constellation:
             tracking_strat,
             frequency,
             opt_args,
+            fixed_params=None,
             const_name=None):
         """Constructor."""
         self._antenna_model = module.AntennaModel(frequency, opt_args)
@@ -162,6 +164,7 @@ class Constellation:
         self._tracking_strategy = tracking_strat
         self._tle_file = tle_file
         self._name = const_name or 'Unknown constellation'
+        self._fixed_params = fixed_params
 
     antenna_model = property(lambda self: self._antenna_model)
     # Not pickle-able so regenerate as needed.
@@ -170,6 +173,7 @@ class Constellation:
     geo_angle = property(lambda self: self._geo_angle)
     tracking_strat = property(lambda self: self._tracking_strategy)
     name = property(lambda self: self._name)
+    fixed_params = property(lambda self: self._fixed_params)
 
     def __str__(self):
         return self.name
@@ -195,6 +199,13 @@ class Constellation:
         # If Random, return random pass.
         if self.tracking_strat == Constellation.TrackingStrategy.RANDOM:
             return [random.choice(passes) if passes else None for passes in sat_coords]
+
+        # pylint: disable=fixme
+        # Todo: Enable a fixed tracking mode, that models an antenna held at a fixed position
+        #  relative to the ground station.
+        # # If Fixed, return pass modelled by a fixed location.
+        # if self.tracking_strat == Constellation.TrackingStrategy.FIXED:
+        #     return array((0, *self.fixed_params), dtype=IdxSphericalCoordinate)
 
         # Else, return highest elevation pass
         return [max(passes, key=lambda y: y['el']) if passes else None for passes in sat_coords]
@@ -232,6 +243,17 @@ class Constellation:
                 and not is_in_exclusion_zones(excl_zones, sat_coord[1], sat_coord[0])
             ] for coords in const_coords.transpose((2, 0, 1))  # Transposed to time, sat, coord.
         ]
+
+    def _get_fixed_params(self):
+        """Get fixed earth station pointing parameters from user."""
+        # pylint: disable=fixme
+        # Fixme: Function is only a quick solution to implementing location of a Fixed transmitter.
+        print(f"Tracking strategy FIXED was selected for Constellation '{self.name}'")
+        elevation = float(input("\nEnter a fixed elevation, in degrees: "))
+        azimuth = float(input("Enter a fixed azimuth, in degrees: "))
+        distance = float(input("Enter a fixed link distance, in km: ")) * 1000
+
+        return elevation, azimuth, distance
 
 
 def longest_hold(vis_sats_by_timestep):
