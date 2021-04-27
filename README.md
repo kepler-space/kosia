@@ -77,13 +77,14 @@ Config files (and therefore, command line instances) must contain all mandatory 
 |`duration` | Y | Duration of the simulation. | float | Days | 3.5|
 |`sim_block_size` | Y | The number of days to simulate   at once. | float | n/a | 0.2|
 |`save_data, no_save_data` | N | Boolean flag for whether to   save output data (.npy files and graphs) or not. Will save by default. | boolean | n/a | TRUE|
-|`gs` | Y | The latitude/longitude pair   for the ground station, given as a comma-separate pair. | float,float | deg | 35,-79|
+|`gs` | Y | The latitude/longitude pair   for the ground station, given as a comma-separated pair. | float,float | deg | 35,-79|
 |`freq_dl` | Y | The downlink frequency, in   GHz. | float | GHz | 14.5|
 |`freq_ul` | Y | The uplink frequency, in GHz. | float | GHz | 11.6|
 |`vic_tle_file,   inter_tle_file` | Y | Path to the TLE file for the   constellation. | string | n/a | ~/TLE/kepler.txt|
 |`vic_min_el, inter_min_el` | Y | Minimum elevation for the   constellation Earth station. | float | deg | 10|
 |`vic_geo_angle,   inter_geo_angle` | Y | The GEO exclusion angle of the   constellation. | float | deg | 18.2|
 |`vic_tracking_strat,   inter_tracking_strat` | Y | The strategy to use for   selecting interfering satellites in the I/N calculation. | string | n/a | One of: "Random", "Highest Elevation", "Longest Hold"|
+|`vic_fixed_params` | N | The elevation/azimuth pair of a fixed pointing antenna at the ground station location, given as a comma-separated pair. | float,float | deg | 30,270|
 |`vic_module, inter_module` | Y | Which antenna to use for the   simulation. | string | n/a | kepler_interference|
 |`inter_const_name` | Y | The name of the interfering   constellation (for graph titles). | string | n/a | SpaceX4408|
 |`parallel` | N | How many CPU threads to use   for the simulation. 1 means to   use a single core, while 0 lets the program choose. Default is 0. | integer | n/a | 0|
