@@ -4,7 +4,7 @@ from enum import Enum
 import random
 from numpy import (  # pylint: disable=no-name-in-module
     arange, arctan, array, cos, degrees, radians, repeat as np_repeat, sin, sqrt, tan, where)
-
+from numpy import arctan2
 # pylint: disable=import-error
 from recordclass import recordclass
 from skyfield.api import load, Topos
@@ -42,7 +42,7 @@ def get_geo_belt_points(position):
     lat_r = radians(position.lat)
 
     # Azimuth.
-    az = 180 + degrees(arctan(tan(lon_diff_r) / sin(lat_r)))
+    az = 180 + degrees(arctan2(tan(lon_diff_r), sin(lat_r)))
     az = where(position.lat < 0, az - 180, az)
     az = where(az < 0, az + 360.0, az)
 
@@ -50,7 +50,7 @@ def get_geo_belt_points(position):
     r_1 = 1 + GEO_ORBIT_KM / (ERAD / 1000)
     v_1 = r_1 * cos(lat_r) * cos(lon_diff_r) - 1
     v_2 = r_1 * sqrt(1 - (cos(lat_r)**2) * (cos(lon_diff_r)**2))
-    el = degrees(arctan(v_1 / v_2))
+    el = degrees(arctan2(v_1 , v_2))
 
     return zip(az, el)
 
@@ -254,6 +254,7 @@ class Constellation:
         distance = float(input("Enter a fixed link distance, in km: ")) * 1000
 
         return elevation, azimuth, distance
+
 
 
 def longest_hold(vis_sats_by_timestep):
