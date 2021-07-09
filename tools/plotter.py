@@ -1,8 +1,9 @@
 """This script plots I/N or C/I+N for any number of .simdata files input as filepaths"""
 import os
-from numpy import histogram, cumsum, linspace, load
+from numpy import histogram, cumsum, linspace, load, repeat, append
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+
 
 rcParams["savefig.directory"] = os.chdir(os.path.dirname(__file__))
 # pylint: disable=import-error
@@ -21,13 +22,16 @@ colors = [
 ]
 
 
-def generate_stats(data):
+
+def generate_stats(data,data_amt , args):
     """
     Takes a set of simulation data (e.g. I/N values) and returns information required to plot the
     data as a cumulative density function.
 
     Args:
         data: Data loaded from a Simdata file.
+        data_amt (string): choice between plotting data when visible or at all timsteps
+        args: simulation parameters form the batch file
 
     Returns: Bins and CDFs
 
@@ -38,6 +42,12 @@ def generate_stats(data):
     if len(data) == 0:
         return bins_plt, cdfs
 
+    if data_amt == 'All':
+        duration = 86400*float(args['duration'])
+        tstep = float(args['granularity'])
+        total_tsteps = int(duration/tstep)
+        delta_tsteps = total_tsteps - len(data)
+        data = append(data,repeat(-100,delta_tsteps))
     no_bins = 100
     step = (data.max() - data.min()) / (no_bins - 1)
     bins = linspace(data.min(), data.max() + step, no_bins + 1)
@@ -50,12 +60,13 @@ def generate_stats(data):
 
 
 # pylint: disable=too-many-locals
-def plot_filepaths(file_paths, xlim=None, ylim=None):
+def plot_filepaths(file_paths,data_amt, xlim=None, ylim=None):
     """
     Plots I/N for any number of .npy files input as filepaths.
 
     Args:
         file_paths (tuple): Tuple of file paths as strings.
+        data_amt (string): choice between plotting data when visible or at all timsteps
         xlim (tuple): Tuple setting the plot x limits, e.g. (-54, 30)
         ylim (tuple): Tuple setting the plot y limits, e.g. (0.0001, 100)
 
@@ -82,10 +93,22 @@ def plot_filepaths(file_paths, xlim=None, ylim=None):
             bins_inst = load(f, allow_pickle=True)
             args = load(f, allow_pickle=True).tolist()
             props = load(f, allow_pickle=True).tolist()
+            try:
+                funcs = load(f, allow_pickle=True).tolist()
+                vic_antenna_file = load(f, allow_pickle=True)
+                vic_antenna_file = str(vic_antenna_file)
+                inter_antenna_file = load(f, allow_pickle=True)
+                inter_antenna_file = str(inter_antenna_file)
+            except:
+                print("Older version of SimData")
+                vic_antenna_file = 'victim antenna file not present in file'
+                inter_antenna_file = 'interfering antenna file not present in file'
+
+
 
         cfg = Config(args)
         lbl = (cfg.name, str(cfg.duration), str(cfg.gs.lat), str(cfg.gs.lon), file.split("\\")[-1])
-        bins, cdfs = generate_stats(i_n_data)
+        bins, cdfs = generate_stats(i_n_data,data_amt , args)
 
         print("Plotting...")
         file_nm = file.split("/")[-1].split(".")[0].lstrip("_")
@@ -111,6 +134,9 @@ def plot_filepaths(file_paths, xlim=None, ylim=None):
 if __name__ == '__main__':
     folder = os.getcwd()
     paths = open_file_dialog(folder, file_types=[("Simdata", ".simdata")], plural=True)
+    # This data amount decides if the data should be analyzed at all timesteps
+    # or just when there are visible satellites
+    data_amt = 'Vis' # can be 'Vis' or 'All'
 
     if paths:
-        plot_filepaths(paths)
+        plot_filepaths(paths,data_amt)
