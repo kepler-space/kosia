@@ -2,12 +2,18 @@
 import argparse
 from math import ceil
 from time import monotonic
-from sys import stderr
-from os import listdir
+from sys import stderr, argv
+from os import listdir, path
+import re
+import inspect
+from collections import namedtuple
+
+
+import numpy as np
 from numpy import cumsum, histogram, save as np_save, dstack, vstack, repeat, linspace
 from pandas import DataFrame
 import matplotlib.pyplot as plt
-
+import getopt
 # pylint: disable=import-error
 from skyfield.constants import DAY_S
 from open_source_i_n import antenna, geometry, simulator, config
@@ -21,11 +27,8 @@ TAGS = ['I_N', 'C_I_N', 'C_I', 'C_N']
 # Global parameters
 settings_path = relative_path('settings.ini')
 settings = read_config_file(relative_path('settings.ini'))
-save_folder = relative_path(settings['output_folder'])
+save_folder = ""
 cfg = []
-
-# High level checks
-check_folder(save_folder)  # Check if output older exists
 
 
 # Private functions
@@ -37,12 +40,15 @@ class Result:
         TLEs, and config inputs.
         - Plotting scripts for displaying the data.
     """
-    def __init__(self, data_uldl_pair, tag, sim, args):     # pylint: disable=redefined-outer-name
+    def __init__(self, data_uldl_pair, tag, sim, args, vic_antenna_file,inter_antenna_file):     # pylint: disable=redefined-outer-name
         self.data = data_uldl_pair
         self.tag = tag
         self.sim = sim
         self.args = args
         self.bins, self.cdfs = self.__generate_stats()
+        self.vic_antenna_file = vic_antenna_file
+        self.inter_antenna_file = inter_antenna_file
+
 
     def __generate_stats(self):
         """
@@ -78,7 +84,7 @@ class Result:
     def save_data(self):
         """Save results to SIMDATA file."""
         _save_results(self.sim.constellations, self.args.duration, self.data, self.cdfs, self.bins,
-                      self.tag, self.args.name)
+                      self.tag, self.args.name, self.vic_antenna_file, self.inter_antenna_file)
 
 
 # pylint: disable=too-many-arguments
@@ -129,7 +135,7 @@ def _plot(constels,
 
 
 # pylint: disable=too-many-arguments,redefined-outer-name
-def _save_results(constels, sim_days, data, cdf, bins_plt, mode_tag, sim_name):
+def _save_results(constels, sim_days, data, cdf, bins_plt, mode_tag, sim_name,vic_antenna_file, inter_antenna_file):
     """Save uplink and downlink interference results to disk.
 
     Args:
@@ -140,11 +146,18 @@ def _save_results(constels, sim_days, data, cdf, bins_plt, mode_tag, sim_name):
         bins_plt: Bins for CDF data.
         mode_tag: Specification of dataset type (I/N, C/N, C/I, C/I+N)
         sim_name: User name for simulation
+        vic_antenna_file: bytes object containing entire victim antenna template file
+        inter_antenna_file: bytes object containing entire interferer antenna template file
+
 
     Returns:
 
     """
 
+    funcs = {'inter_dl_psd' : inspect.getsource(constels['inter']._antenna_model.interfering_sat_dl_psd),
+             'inter_ul_psd' :  inspect.getsource(constels['inter']._antenna_model.interfering_es_ul_psd),
+             'vic_dl_g_t' :inspect.getsource(constels['vic']._antenna_model.victim_es_dl_g_over_t),
+             'vic_ul_g_t' : inspect.getsource(constels['vic']._antenna_model.victim_sat_ul_g_over_t)}
     for uldl in data.__fields__:
         filename = save_folder / f'{sim_name}_{uldl}_{constels.inter}_' \
                                  f'{mode_tag}_{sim_days:.4f}_days.simdata'
@@ -158,6 +171,9 @@ def _save_results(constels, sim_days, data, cdf, bins_plt, mode_tag, sim_name):
                     "vic_props": constels['vic']._antenna_model.props,
                     "inter_props": constels['inter']._antenna_model.props
                 })
+            np_save(file, funcs)
+            np_save(file,vic_antenna_file)
+            np_save(file,inter_antenna_file)
 
 
 # pylint: disable=redefined-outer-name
@@ -183,6 +199,16 @@ def _configure_sim(args):
 def main(args):
     """Main launcher of simulation."""
     print_config(cfg)
+
+    # Set up save folder
+    global save_folder
+    output_setting = get_setting(settings, 'output_folder', optional=True)
+    if output_setting:
+        save_folder = relative_path(output_setting)
+    else:
+        save_folder = relative_path(f"output/{args.inter_const_name}-to-{args.vic_const_name}")
+    check_folder(save_folder)  # Check if output older exists
+
 
     # Set up simulation interval
     sim_interval = Interval(0, args.duration * DAY_S, args.granularity)  # Simulation interval (s).
@@ -267,11 +293,30 @@ def main(args):
         outputs[i].ul = master_block[i, 0, :][master_block[i, 0, :] != 0]
         outputs[i].dl = master_block[i, 1, :][master_block[i, 1, :] != 0]
 
+    antenna_files = []
+    vic_module_fpath = args.vic_module.__file__
+    inter_module_fpath = args.inter_module.__file__
+    with open(vic_module_fpath,'r') as vfile:
+        # vic_module_string = vfile.readlines()
+        vic_module_string = vfile.read()
+        vic_module_list = np.array(vic_module_string)
+        # vic_module_bytes = bytearray(vic_module_string,'utf-8')
+        # vic_module_bytes = vic_module_string.encode('utf-8')
+    with open(inter_module_fpath,'r') as ifile:
+        # inter_module_string = ifile.readlines()
+        inter_module_string = ifile.read()
+        inter_module_list = np.array(inter_module_string)
+        # inter_module_bytes = bytearray(inter_module_string,'utf-8')
+        # inter_module_bytes = inter_module_string.encode('utf-8')
+
     # Output results
     results = list(
-        map(lambda x, y, z, a: Result(x, y, z, a), outputs, TAGS, repeat(sim, len(outputs)),
-            repeat(args, len(outputs))))
+        map(lambda x, y, z, a, b, c: Result(x, y, z, a, b, c), outputs, TAGS, repeat(sim, len(outputs)),
+            repeat(args, len(outputs)),repeat(vic_module_list, len(outputs)),repeat(inter_module_list, len(outputs))))
 
+	# FIXME: Temporary edit to enable output of I/N only
+    # results[0].plot()
+    # results[0].save_data()
     for i in results:
         i.plot()
         i.save_data()
@@ -375,6 +420,12 @@ def get_arg_parser():
                         help="Interfering constellation name (for graphs).",
                         required=True)
     parser.add_argument('--inter_opt_args', help="Optional interfering antenna parameters.")
+    parser.add_argument("--inter_fixed_params",
+                        type=lambda x: tuple(map(float, x.split(','))),
+                        help="If the interfering antenna will be 'stuck' in a given pointing direction, "
+                             "please specify the elevation and azimuth in degrees, separated by "
+                             "a comma (e.g. '30,145').",
+                        default="")
     parser.add_argument(
         "--parallel",
         type=int,
@@ -389,7 +440,7 @@ def get_arg_parser():
     return parser
 
 
-def run_batch_list(path):
+def run_batch_list(path, filter_list=None):
     """
     Runs all batch or shell files in a specified folder path in sequence.
 
@@ -414,7 +465,11 @@ def run_batch_list(path):
         raise SystemExit
 
     # Scan folder for files
-    file_list = [i for i in listdir(path) if i.endswith(file_ext)]
+    if filter_list is None:
+        file_list = [i for i in listdir(path) if i.endswith(file_ext)]
+    else:
+        file_list = [i for i in listdir(path) if
+                     i.endswith(file_ext) and any(filter_word in i for filter_word in filter_list)]
     global cfg              # pylint: disable=invalid-name,global-statement
 
     # Run through files sequentially, routing any errors to a text file if accept_errors is True.
@@ -468,11 +523,24 @@ if __name__ == '__main__':
         # Specify a folder containing batch or shell files. These will be run in sequence.
         print("RUN MODE:", RUN_MODE)
         folder_specified = get_setting(settings, 'batch_list_folder', optional=True)
+        filter_list = None
         if folder_specified:
-            batch_list_folder = relative_path(folder_specified)
+            if len(argv[1:]) > 0:
+                try:
+                    opts, args = getopt.getopt(argv[1:], "s:f", ["subdir=", "filter="])
+                    for opt, arg in opts:
+                        if opt in ("-s", "--subdir"):
+                            subdir_name = arg
+                        elif opt in ("-f", "--filter"):
+                            filter_list = list(arg.split(','))
+                    batch_list_folder = relative_path(path.join(folder_specified, subdir_name))
+                except getopt.GetoptError:
+                    batch_list_folder = relative_path(folder_specified)
+            else:
+                batch_list_folder = relative_path(folder_specified)
         else:
             batch_list_folder = relative_path(open_folder_dialog(root_path_src))
-        run_batch_list(batch_list_folder)
+        run_batch_list(batch_list_folder, filter_list)
     else:
         print(f"Error: run_mode '{RUN_MODE}' not recognized. Accepted values are 'cli', "
               f"'batch_select', or 'batch_list'.",
