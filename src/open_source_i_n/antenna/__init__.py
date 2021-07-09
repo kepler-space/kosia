@@ -4,6 +4,8 @@ import importlib
 from types import SimpleNamespace
 import scipy.constants as consts
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+
 
 
 # pylint: disable=too-few-public-methods
@@ -132,8 +134,70 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         return interfering_sat_dl_psd
 
     @staticmethod
+    def interfering_sat_dl_psd_nd(gain_sat_dl, power_db, bw_hz, pointing=False):
+        """Non Directional Antenna, as applied to calculate interfering satellite downlink PSD."""
+
+        def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_nd_sat(gain_sat_dl) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_sat_dl_psd
+
+    @staticmethod
+    def interfering_sat_dl_psd_abcdphi(gain_sat_dl, power_db, bw_hz, A, B, C, D, phi1, pointing=False):
+        """ABCDphi Antenna, as applied to calculate interfering satellite downlink PSD."""
+
+        def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
+            off_axis_angle = sim_geom['inter'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_abcdphi_sat(gain_sat_dl, off_axis_angle, A, B, C, D, phi1) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_sat_dl_psd
+
+    @staticmethod
+    def interfering_sat_dl_psd_465_5(gain_sat_dl, power_db, bw_hz, freq_hz, A, pointing=False):
+        """465-5 Antenna, as applied to calculate interfering satellite downlink PSD."""
+
+        def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
+            off_axis_angle = sim_geom['inter'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_465_5_sat(gain_sat_dl, off_axis_angle, freq_hz, A) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_sat_dl_psd
+
+
+    @staticmethod
+    def interfering_sat_dl_psd_672_4(gain_sat_dl, power_db, bw_hz, freq_hz, phi_0, pointing=False):
+        """672-4 Antenna, as applied to calculate interfering satellite downlink PSD."""
+
+        def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
+            off_axis_angle = sim_geom['inter'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_672_4_sat(gain_sat_dl, off_axis_angle, freq_hz, phi_0) + power_db - 10 * np.log10(
+                bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_sat_dl_psd
+
+    @staticmethod
     def interfering_sat_dl_psd_s1528(gain_sat_dl,  # pylint: disable=invalid-name,too-many-arguments
-                                     diam,
                                      power_db,
                                      bw_hz,
                                      hpbw,
@@ -142,13 +206,13 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         """Standard pattern S.1528, as applied to calculate interfering satellite downlink PSD."""
 
         def interfering_sat_dl_psd(self, sim_geom):  # pylint: disable=unused-argument
-            sep_angle = sim_geom['vic'].sep_ang
+            off_axis_angle = sim_geom['inter'].nad_ang
             if pointing:
-                sep_angle = 0
+                off_axis_angle = 0
 
             # Return EIRP = G + P - BW - FSPL
             eirp_hz = self.gain_s1528_sat(
-                gain_sat_dl, diam, sep_angle, self.frequency.dl, hpbw,
+                gain_sat_dl, off_axis_angle, self.frequency.dl, hpbw,
                 L_N=L_N) + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
@@ -157,17 +221,69 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         return interfering_sat_dl_psd
 
     @staticmethod
-    def interfering_es_ul_psd_app8(gain_es_ul, diam_es, power_db, bw_hz, pointing=False):
+    def interfering_es_ul_psd_nd(gain_es_ul, power_db, bw_hz, pointing=False):
+        """Non Directional Antenna, as applied to calculate interfering satellite uplink PSD."""
+
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_nd_es(gain_es_ul) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_es_ul_psd
+
+    @staticmethod
+    def interfering_es_ul_psd_abcdphi(gain_es_ul, power_db, bw_hz,A,B,C,D,phi1 ,pointing=False):
+        """ABCDphi Antenna, as applied to calculate interfering satellite uplink PSD."""
+
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter)>0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
+            # sep_angle = sim_geom['vic'].zen_ang
+            if pointing:
+                sep_angle = 0
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_abcdphi_es(gain_es_ul,sep_angle,A,B,C,D,phi1) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_es_ul_psd
+
+    @staticmethod
+    def interfering_es_ul_psd_465_5(gain_es_ul, power_db, bw_hz,freq_hz, A, pointing=False):
+        """ABCDphi Antenna, as applied to calculate interfering satellite uplink PSD."""
+
+        def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter) > 0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
+            if pointing:
+                sep_angle = 0
+            # Return EIRP = G + P - BW - FSPL
+            eirp_hz = self.gain_465_5_es(gain_es_ul,sep_angle,freq_hz,A) + power_db - 10 * np.log10(bw_hz)
+
+            # Return the Received PSD in dBW/Hz/m^2
+            return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
+
+        return interfering_es_ul_psd
+
+
+    @staticmethod
+    def interfering_es_ul_psd_ap8(gain_es_ul, power_db, bw_hz, pointing=False):
         """Standard Appendix 8 pattern, as applied to calculate interfering satellite uplink PSD."""
 
         def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter) > 0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
             if pointing:
                 sep_angle = 0
 
             # Return EIRP = G + P - BW - FSPL
-            eirp_hz = self.gain_app8_es(gain_es_ul, diam_es, sep_angle,
-                                        self.frequency.ul) + power_db - 10 * np.log10(bw_hz)
+            eirp_hz = self.gain_ap8_es(gain_es_ul, sep_angle) + power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
             return eirp_hz + self.freespace_loss(sim_geom['vic'].dist, self.frequency.ul)
@@ -180,6 +296,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter) > 0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
             if pointing:
                 sep_angle = 0
 
@@ -198,6 +316,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter) > 0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
             if pointing:
                 sep_angle = 0
 
@@ -222,7 +342,6 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
     @staticmethod
     def interfering_es_ul_psd_s1528(gain_es_ul,    # pylint: disable=invalid-name,too-many-arguments
-                                    diam_es,
                                     es_power_db,
                                     bw_hz,
                                     hpbw,
@@ -235,12 +354,14 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def interfering_es_ul_psd(self, sim_geom):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['vic'].fixed_ang_inter) > 0.001:
+                sep_angle = sim_geom['vic'].fixed_ang_inter
             if pointing:
                 sep_angle = 0
 
             # Return EIRP = G + P - BW - FSPL
             eirp_hz = self.gain_s1528_sat(
-                gain_es_ul, diam_es, sep_angle, self.frequency.ul, hpbw,
+                gain_es_ul,  sep_angle, self.frequency.ul, hpbw,
                 L_N=L_N) + es_power_db - 10 * np.log10(bw_hz)
 
             # Return the Received PSD in dBW/Hz/m^2
@@ -250,8 +371,80 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
     # Standard G/T calculators
     @staticmethod
+    def victim_sat_ul_g_over_t_nd(gain_sat_ul,
+                                 temp_sys_sat,
+                                 other_losses_db=0,
+                                 pointing=False):
+        """Non directional satellite as applied to calculate victim Sat uplink G/T."""
+
+        def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            # Return G/T
+            return self.gain_nd_sat(gain_sat_ul) - 10 * np.log10(temp_sys_sat) - other_losses_db
+
+        return victim_sat_ul_gain
+
+    @staticmethod
+    def victim_sat_ul_g_over_t_abcdphi(gain_sat_ul,
+                                 temp_sys_sat,
+                                 A,
+                                 B,
+                                 C,
+                                 D,
+                                 phi1,
+                                 other_losses_db=0,
+                                 pointing=False):
+        """ABCDphi satellite as applied to calculate victim Sat uplink G/T."""
+
+        def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            # Return G/T
+            off_axis_angle = sim_geom['vic'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            return self.gain_abcdphi_sat(gain_sat_ul, off_axis_angle, A, B, C, D, phi1) - 10 * np.log10(temp_sys_sat) - other_losses_db
+
+        return victim_sat_ul_gain
+
+    @staticmethod
+    def victim_sat_ul_g_over_t_465_5(gain_sat_ul,
+                                       temp_sys_sat,
+                                       A,
+                                       other_losses_db=0,
+                                       pointing=False):
+        """465-5 satellite as applied to calculate victim Sat uplink G/T."""
+
+        def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            # Return G/T
+            off_axis_angle = sim_geom['vic'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            return self.gain_465_5_sat(gain_sat_ul, off_axis_angle, A) - 10 * np.log10(
+                temp_sys_sat) - other_losses_db
+
+        return victim_sat_ul_gain
+
+   
+
+    @staticmethod
+    def victim_sat_ul_g_over_t_672_4(gain_sat_ul,
+                                       temp_sys_sat,
+                                       freq_hz,
+                                       phi_0,
+                                       other_losses_db=0,
+                                       pointing=False):
+        """672-4 satellite as applied to calculate victim Sat uplink G/T."""
+
+        def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            # Return G/T
+            off_axis_angle = sim_geom['vic'].nad_ang
+            if pointing:
+                off_axis_angle = 0
+            return self.gain_672_4_sat(gain_sat_ul, off_axis_angle, freq_hz, phi_0) - 10 * np.log10(
+                temp_sys_sat) - other_losses_db
+
+        return victim_sat_ul_gain
+
+    @staticmethod
     def victim_sat_ul_g_over_t_s1528(gain_sat_ul,  # pylint: disable=invalid-name,too-many-arguments
-                                     diam,
                                      temp_sys_sat,
                                      hpbw,
                                      other_losses_db=0,
@@ -261,21 +454,210 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         """Standard pattern S.1528, as applied to calculate victim satellite uplink G/T."""
 
         def victim_sat_ul_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
-            sep_angle = sim_geom['vic'].sep_ang
+            off_axis_angle = sim_geom['vic'].nad_ang
+
             if pointing:
-                sep_angle = 0
+                off_axis_angle = 0
             if use_nad_ang:
-                sep_angle = sim_geom['vic'].nad_ang
+                off_axis_angle = sim_geom['vic'].nad_ang
 
             # Return G/T
-            return self.gain_s1528_sat(gain_sat_ul, diam, sep_angle, self.frequency.ul, hpbw,
+            return self.gain_s1528_sat(gain_sat_ul, off_axis_angle, self.frequency.ul, hpbw,
                                        L_N) - 10 * np.log10(temp_sys_sat) - other_losses_db
 
         return victim_sat_ul_gain
 
+    
+
     @staticmethod
-    def victim_es_dl_g_over_t_app8(gain_es_dl,
-                                   diam_es,
+    def victim_es_dl_g_over_t_nd(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """Non directional earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            # Return G/T
+            return self.gain_nd_es(gain_es_dl) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_abcdphi(gain_es_dl,
+                                     temp_sys_es,
+                                      A,
+                                      B,
+                                      C,
+                                      D,
+                                      phi1,
+                                     other_losses_db=0,
+                                     pointing=False,):
+        """abcdphi earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+
+            # Return G/T
+            return self.gain_abcdphi_es(gain_es_dl,sep_angle,A,B,C,D,phi1) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_465_5(gain_es_dl,
+                                      temp_sys_es,
+                                      A,
+                                      other_losses_db=0,
+                                      pointing=False, ):
+        """465-5 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+
+            # Return G/T
+            return self.gain_465_5_es(gain_es_dl,sep_angle,A) - 10 * np.log10(
+                temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    
+  
+    
+    @staticmethod
+    def victim_es_dl_g_over_t_240V01(gain_es_dl,
+                                 temp_sys_es,
+                                 other_losses_db=0,
+                                 pointing=False):
+        """240V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_240V01_es(sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_242V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """242V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_242V01_es(sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_244V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """244V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_244V01_es(gain_es_dl,sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_028V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """028V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_028V01_es(gain_es_dl, sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_230V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """230V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_230V01_es(gain_es_dl, sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_235V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """235V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_235V01_es(gain_es_dl, sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_229V01(gain_es_dl,
+                                     temp_sys_es,
+                                     other_losses_db=0,
+                                     pointing=False):
+        """229V01 earth station, as applied to calculate victim ES downlink G/T."""
+
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
+            sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
+            if pointing:
+                sep_angle = 0
+            # Return G/T
+            return self.gain_229V01_es(gain_es_dl, sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
+
+        return victim_es_dl_gain
+
+    @staticmethod
+    def victim_es_dl_g_over_t_ap8(gain_es_dl,
                                    temp_sys_es,
                                    other_losses_db=0,
                                    pointing=False):
@@ -283,13 +665,14 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
             if pointing:
                 sep_angle = 0
 
             # Return G/T
-            return self.gain_app8_es(
-                gain_es_dl, diam_es, sep_angle,
-                self.frequency.dl) - 10 * np.log10(temp_sys_es) - other_losses_db
+            return self.gain_ap8_es(
+                gain_es_dl, sep_angle) - 10 * np.log10(temp_sys_es) - other_losses_db
 
         return victim_es_dl_gain
 
@@ -302,6 +685,8 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
             if pointing:
                 sep_angle = 0
 
@@ -319,8 +704,10 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
                                     pointing=False):
         """Standard pattern S.1428, as applied to calculate victim ES downlink G/T."""
 
-        def victim_es_dl_gain(self, esim_geom, mode):  # pylint: disable=unused-argument
+        def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
             if pointing:
                 sep_angle = 0
 
@@ -343,7 +730,6 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
     @staticmethod
     def victim_es_dl_g_over_t_s1528(gain_es_dl,   # pylint: disable=invalid-name,too-many-arguments
-                                    diam_es,
                                     temp_sys_es,
                                     hpbw,
                                     other_losses_db=0,
@@ -356,11 +742,13 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
 
         def victim_es_dl_gain(self, sim_geom, mode):  # pylint: disable=unused-argument
             sep_angle = sim_geom['vic'].sep_ang
+            if abs(sim_geom['inter'].fixed_ang_vic) > 0.001:
+                sep_angle = sim_geom['inter'].fixed_ang_vic
             if pointing:
                 sep_angle = 0
 
             # Return G/T
-            return self.gain_s1528_sat(gain_es_dl, diam_es, sep_angle, self.frequency.dl, hpbw,
+            return self.gain_s1528_sat(gain_es_dl, sep_angle, self.frequency.dl, hpbw,
                                        L_N) - 10 * np.log10(temp_sys_es) - other_losses_db
 
         return victim_es_dl_gain
@@ -368,30 +756,327 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
     # Standard Off-axis gain calculators
     @staticmethod
     # pylint: disable=invalid-name,too-many-branches
-    def gain_app8_es(gain_es_dl, diam_es, sep_angle, freq_hz):
+    def gain_nd_es(gain_es_dl):
+        """
+                    Non-directional earth station (ITU APEND_099V01)
+
+                    Args:
+                        gain_es_dl (float): RX gain of earth station
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_abcdphi_es(gain_es_dl,sep_angle,A,B,C,D,phi1):
+        """
+                    Non-standard generic earth station antenna pattern described
+                    by 4 main coefficients: A, B, C, D and angle phi1. (ITU APENST807V01)
+
+                    Args:
+                        gain_es_dl (float): RX gain of earth station
+                        sep_angle (float): Separation angle (degrees) between victim satellite and
+                                           chosen interfering satellite.
+                        A (float): Coeffecient A
+                        B (float): Coeffecient B
+                        C (float): Coeffecient C
+                        D (float): Coeffecient D
+                        phi1 (float): Angle phi1 (degrees)
+                    Returns:
+                        G_phi (float): Off axis gain of earth station
+                    """
+        # Return Gain
+
+        if sep_angle>=0 and sep_angle<1:
+            G_phi = gain_es_dl
+        elif sep_angle>1 and sep_angle<=phi1:
+            G_phi = A-B*np.log10(sep_angle)
+        elif sep_angle>phi1 and sep_angle<=180:
+            G_phi = max(min(A-B*np.log10(phi1),C-D*np.log10(sep_angle)),-10)
+        else:
+            raise ValueError(
+                "Inappropriate separation angle value submitted to antenna pattern. "
+                "Phi must be between 0 and 180. Phi: {}".format(sep_angle))
+
+        if G_phi>gain_es_dl:
+            G_phi = gain_es_dl
+        if G_phi<-10:
+            G_phi = -10
+        return G_phi
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_465_5_es(gain_es_dl,sep_angle,A):
+        """
+                    Non-standard generic earth station antenna pattern similar to
+                    that in Recommendation ITU-R S.465-5, where the side-lobe
+                    radiation is represented by the expression CoefA - 25 log(phi). (ITU APENST806V01)
+
+                    Args:
+                        gain_es_dl (float): RX gain of earth station
+                        sep_angle (float): Separation angle (degrees) between victim satellite and
+                                           chosen interfering satellite.
+                        A (float): Coeffecient A
+                    Returns:
+                        G_phi (float): Off axis gain of earth station
+                    """
+        # Return Gain
+        G_max = gain_es_dl
+
+        eta = 0.7 # Effeciency, taken from ITU doc
+        D_lmbda = np.sqrt((10**(0.1*G_max))/(eta*np.power(np.pi,2)))
+
+
+        if D_lmbda > 100:
+            G1 = A
+            phi_r = 1
+        elif D_lmbda <= 100:
+            G1 = A - 50 + 25*np.log10(D_lmbda)
+            phi_r = 100/D_lmbda
+
+        phi_m = (20 / D_lmbda) * np.sqrt(G_max - G1)
+        phi_b = 10**((A+10)/25)
+
+        if 0<= sep_angle and sep_angle< phi_m:
+            G_phi = G_max -0.0025 * (D_lmbda*sep_angle)**2
+        elif phi_m <= sep_angle and sep_angle < phi_r:
+            G_phi = G1
+        elif phi_r <= sep_angle and sep_angle <= 180:
+            G_phi = max(A - 25*np.log10(sep_angle),-10)
+        else:
+            raise ValueError(
+                "Inappropriate separation angle value submitted to antenna pattern. "
+                "Phi must be between 0 and 180. Phi: {}".format(sep_angle))
+
+        return G_phi
+
+    
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_240V01_es(sep_angle):
+        """
+                    ITU APEMLA240V01 earth station for GSO
+
+                    Args:
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        if 0<= sep_angle and sep_angle < 45:
+            gain_es_dl = 5-0.002*sep_angle**2
+        elif 45<= sep_angle and sep_angle <= 180:
+            gain_es_dl = 1
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_242V01_es(sep_angle):
+        """
+                    ITU APEMLA242V01 earth station for GSO
+
+                    Args:
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        D = 0.3
+        c = 3e8
+        f = 1.5e9
+        lmbda = c /f
+        D_lmbda = D/lmbda
+
+        if 0 <= sep_angle and sep_angle < 11.4:
+            gain_es_dl = 14 - 0.003 * sep_angle ** 2
+        elif 11.4 <= sep_angle and sep_angle < 28.8:
+            gain_es_dl = 10.1
+        elif 28.8<= sep_angle and sep_angle < 73:
+            gain_es_dl = 52 - 10*np.log10(D_lmbda) -25*np.log10(sep_angle)
+        elif 73 <= sep_angle and sep_angle <= 180:
+            gain_es_dl = 0
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_244V01_es(max_gain,sep_angle):
+        """
+                    ITU APEMLA244V01 earth station for GSO
+
+                    Args:
+                        max_gain (float): Maximum gain of ground station
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        D = 0.7
+        c = 3e8
+        f = 1.5e9
+        lmbda = c / f
+        D_lmbda = D / lmbda
+
+        if 0 <= sep_angle and sep_angle < 6.7:
+            gain_es_dl = max_gain - 0.12 * sep_angle ** 2
+        elif 6.7 <= sep_angle and sep_angle < 14.4:
+            gain_es_dl = 14.6
+        elif 14.4 <= sep_angle and sep_angle < 53.3:
+            gain_es_dl = 52 - 10 * np.log10(D_lmbda) - 25 * np.log10(sep_angle)
+        elif 53.3 <= sep_angle and sep_angle <= 180:
+            gain_es_dl = 0
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_028V01_es(max_gain, sep_angle):
+        """
+                    ITU APEREC028V01 earth station for GSO
+
+                    Args:
+                        max_gain (float): Maximum gain of ground station
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        A = 44
+        B = 25
+        phi1 = 40
+        phib = 90
+        G_min = -5
+
+        if 0 <= sep_angle and sep_angle < phi1:
+            gain_es_dl = max_gain
+        elif phi1 <= sep_angle and sep_angle < phib:
+            gain_es_dl = A-B*np.log10(sep_angle)
+        elif phib<= sep_angle and sep_angle <= 180:
+            gain_es_dl = G_min
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_230V01_es(max_gain, sep_angle):
+        """
+                    ITU APEUAE230V01 earth station for GSO
+
+                    Args:
+                        max_gain (float): Maximum gain of ground station
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+
+        if 0 <= sep_angle and sep_angle < 60:
+            gain_es_dl = max_gain
+        elif 60 <= sep_angle and sep_angle < 90:
+            gain_es_dl = -0.003*sep_angle**2 + 0.358*sep_angle - 4.68
+        elif 90 <= sep_angle and sep_angle < 130:
+            gain_es_dl = -0.1598*sep_angle + 17.622
+        elif 130 <= sep_angle and sep_angle <= 180:
+            gain_es_dl = -3.15
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_229V01_es(max_gain, sep_angle):
+        """
+                    ITU APEUAE229V01 earth station for GSO
+
+                    Args:
+                        max_gain (float): Maximum gain of ground station
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        phi0 = 28
+        phim = 23
+        phib = 50
+        A = 38
+        B = 25
+        G_min = -5
+
+        if 0 <= sep_angle and sep_angle < phim:
+            gain_es_dl = max_gain - 12*(sep_angle/phi0)**2
+        elif phim <= sep_angle and sep_angle < phib:
+            gain_es_dl = A-B*np.log10(sep_angle)
+        elif phib <= sep_angle and sep_angle <= 180:
+            gain_es_dl = G_min
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_235V01_es(max_gain, sep_angle):
+        """
+                    ITU APEUAE235V01 earth station for GSO
+
+                    Args:
+                        max_gain (float): Maximum gain of ground station
+                        sep_angle (float): Separation angle (degrees)
+
+                    Returns:
+                        gain_es_dl (float): RX gain of earth station
+                    """
+        # Return Gain
+        phi1 = 6
+        phim = 16
+        phir = 30
+        phib = 76
+        A = 44.69
+        B = 25.512
+        G_min = -3.299
+        G1 = 7
+        phi2 = 13.334
+
+        if 0 <= sep_angle and sep_angle < phi1:
+            gain_es_dl = max_gain
+        elif phi1 <= sep_angle and sep_angle < phim:
+            gain_es_dl = max_gain*(1-((sep_angle-phi1)/phi2)**2)
+        elif phim< sep_angle and sep_angle < phir:
+            gain_es_dl = G1
+        elif phir<= sep_angle and sep_angle< phib:
+            gain_es_dl = A-B*np.log10(sep_angle)
+        elif phib <= sep_angle and sep_angle <= 180:
+            gain_es_dl = G_min
+        return gain_es_dl
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_ap8_es(gain_es_dl, sep_angle):
         """
                     Off-axis gain - earth station (Appendix 8, Annex 3 pattern)
 
                     Args:
                         gain_es_dl (float): RX gain of earth station
-                        diam_es: Diameter of earth station
                         sep_angle (float): Separation angle (degrees) between victim satellite and
                                            chosen interfering satellite.
-                        freq_hz (float): Frequency (Hz)
 
                     Returns:
                         float: G off axis (dB) of ground station.
                     """
 
-        D = diam_es
-        lmbda = consts.c / freq_hz
+        # D = diam_es
+        # lmbda = consts.c / freq_hz
         G_max = gain_es_dl
 
-        # In cases where D/lmbda is not given, it may be estimated as 20*log(D/lmbda) =~ G_max - 7.7
-        if not D or not lmbda:
-            D_lmbda = np.exp((G_max - 7.7) / 20)
-        else:
-            D_lmbda = D / lmbda
+        # # In cases where D/lmbda is not given, it may be estimated as 20*log(D/lmbda) =~ G_max - 7.7
+        # if not D or not lmbda:
+        #     D_lmbda = np.exp((G_max - 7.7) / 20)
+        # else:
+        #     D_lmbda = D / lmbda
+
+        D_lmbda = np.exp((G_max - 7.7) / 20)
 
         G_1 = 2 + 15 * np.log10(D_lmbda)
         phi = sep_angle  # degrees
@@ -590,12 +1275,135 @@ class BaseAntennaModel(metaclass=ABCMeta):  # pylint: disable=too-many-public-me
         return G_phi
 
     @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_nd_sat(gain_sat):
+        """
+                    Non-directional satellite (ITU APEND_499V01)
+
+                    Args:
+                        gain_sat (float): RX gain of satellite
+
+                    Returns:
+                        gain_sat (float): RX gain of satellite
+                    """
+        # Return Gain
+        return gain_sat
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_abcdphi_sat(gain_sat, sep_angle, A, B, C, D, phi1):
+        """
+                    Non-standard generic satellite antenna pattern described
+                    by 4 main coefficients: A, B, C, D and angle phi1. (ITU APENST807V01)
+
+                    Args:
+                        gain_sat (float): RX gain of satellite
+                        sep_angle (float): Separation angle (degrees) between victim satellite and
+                                           chosen interfering satellite.
+                        A (float): Coeffecient A
+                        B (float): Coeffecient B
+                        C (float): Coeffecient C
+                        D (float): Coeffecient D
+                        phi1 (float): Angle phi1 (degrees)
+                    Returns:
+                        G_phi (float): Off axis gain of earth station
+                    """
+        # Return Gain
+
+        if sep_angle >= 0 and sep_angle < 1:
+            G_phi = gain_sat
+        elif sep_angle > 1 and sep_angle <= phi1:
+            G_phi = A - B * np.log10(sep_angle)
+        elif sep_angle > phi1 and sep_angle <= 180:
+            G_phi = max(min(A - B * np.log10(phi1), C - D * np.log10(sep_angle)), -10)
+
+        if G_phi > gain_sat:
+            G_phi = gain_sat
+        if G_phi < -10:
+            G_phi = -10
+        return G_phi
+
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_465_5_sat(gain_sat, sep_angle, A):
+        """
+                    Non-standard generic satellite antenna pattern similar to
+                    that in Recommendation ITU-R S.465-5, where the side-lobe
+                    radiation is represented by the expression CoefA - 25 log(phi). (ITU APENST806V01)
+
+                    Args:
+                        gain_sat (float): RX gain of satellite
+                        sep_angle (float): Separation angle (degrees) between victim satellite and
+                                           chosen interfering satellite.
+                        A (float): Coeffecient A
+                    Returns:
+                        G_phi (float): Off axis gain of satellite
+                    """
+        # Return Gain
+        G_max = gain_sat
+        eta = 0.7 # Effeciency, taken from ITU doc
+        D_lmbda = np.sqrt((10**(0.1*G_max))/(eta*np.power(np.pi,2)))
+
+        if D_lmbda > 100:
+            G1 = A
+            phi_r = 1
+        elif D_lmbda <= 100:
+            G1 = A - 50 + 25 * np.log10(D_lmbda)
+            phi_r = 100 / D_lmbda
+
+        phi_m = (20 / D_lmbda) * np.sqrt(G_max - G1)
+        phi_b = 10 ** ((A + 10) / 25)
+
+        if 0 <= sep_angle and sep_angle < phi_m:
+            G_phi = G_max - 0.0025 * (D_lmbda * sep_angle) ** 2
+        elif phi_m <= sep_angle and sep_angle < phi_r:
+            G_phi = G1
+        elif phi_r <= sep_angle and sep_angle <= 180:
+            G_phi = max(A - 25 * np.log10(sep_angle), -10)
+
+        return G_phi
+
+  
+
+     
+    @staticmethod
+    # pylint: disable=invalid-name,too-many-branches
+    def gain_672_4_sat(gain_sat, sep_angle, freq_hz, phi_0):
+        """
+                    Non-standard generic satellite antenna pattern similar to
+                    that in Recommendation ITU-R S.672-4 (ITU APSREC408V01)
+
+                    Args:
+                        gain_sat (float): RX gain of satellite
+                        sep_angle (float): Separation angle (degrees) between victim satellite and
+                                           chosen interfering satellite.
+                        freq_hz (float): Frequency (Hz)
+                        phi_0 (float): Constant phi0 from the definition
+                    Returns:
+                        G_phi (float): Off axis gain of satellite
+                    """
+        # Return Gain
+        G_max = gain_sat
+        lmbda = consts.c / freq_hz
+        a = 2.58
+        b = 6.32
+        L_s = -20
+
+        if 0 <= sep_angle/phi_0 and sep_angle/phi_0 <= a/2:
+            G_phi = G_max - 12*(sep_angle/phi_0)**2
+        elif a/2 < sep_angle/phi_0 and sep_angle/phi_0 <= b/2:
+            G_phi = G_max +L_s
+        elif sep_angle/phi_0>b/2:
+            G_phi = G_max+L_s+20-25*np.log10(2*sep_angle/phi_0)
+
+        return G_phi
+
+    @staticmethod
     # pylint: disable=invalid-name,too-many-arguments,too-many-locals
-    def gain_s1528_sat(gain_sat, diam, sep_angle, freq_hz, hpbw, L_N=-15):
+    def gain_s1528_sat(gain_sat, sep_angle, freq_hz, hpbw, L_N=-15):
         """ Off-axis gain - space station (ITU REC S.1528, recommends 1.2)
             Args:
                 gain_sat (float): Peak antenna gain
-                diam (float): Antenna diameter (m)
                 sep_angle (float): Separation angle (degrees) between victim satellite and
                                    chosen interfering satellite.
                 freq_hz (float):
