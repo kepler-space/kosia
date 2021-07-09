@@ -9,6 +9,7 @@ from matplotlib.ticker import MaxNLocator, LinearLocator
 from open_source_i_n import antenna
 from open_source_i_n.satellite import UlDlPair
 from open_source_i_n.antenna.__init__ import BaseAntennaModel
+from open_source_i_n.simulator import SimGeometry
 
 R_EARTH = 6371000  # Radius of Earth (m)
 
@@ -149,6 +150,8 @@ def plot_patt_list_2d(ant_patt_list, normalize=False):
                 return patt["vec"](DIAM, off_axis_ang, FREQ)
             elif patt["type"] == 'D':
                 return patt["vec"](GAIN, off_axis_ang)
+            elif patt["type"] == 'E':
+                return patt["vec"](GAIN, off_axis_ang, COEFFA)
             else:
                 raise TypeError("Antenna pattern doesn't have recognizable parameters.")
 
@@ -261,6 +264,10 @@ def plot_kosia_antenna_file(plt_ax_tx,
     sep_es = set_mode(sep_mode_es)
     nad_es = set_mode(nad_mode_es)
 
+    # Additional variables
+    zen_es = sep_es     # Fixme: Temporary shortcut
+    zen_ss = sep_ss     # Fixme: Temporary shortcut
+
     # Vectorize the PSD and G/T functions of the antenna pattern
     vec_ul_tx = np.vectorize(ant.interfering_es_ul_psd)
     vec_ul_rx = np.vectorize(ant.victim_sat_ul_g_over_t)
@@ -275,10 +282,38 @@ def plot_kosia_antenna_file(plt_ax_tx,
     a_eff_ul = 10 * np.log10(lam_ul * lam_ul / (4 * np.pi))
 
     # Perform antenna pattern calculations
-    psd_ul = vec_ul_tx(np.abs(elev), sep_es, nad_es, distance)
-    g_t_ul = vec_ul_rx(np.abs(elev), sep_es, nad_es, distance)
-    psd_dl = vec_dl_tx(np.abs(elev), sep_ss, nad_ss, distance)
-    g_t_dl = vec_dl_rx(np.abs(elev), sep_ss, nad_ss, distance)
+    #' sep_ang
+    # elev
+    # nad_ang
+    # zen_ang
+    # fixed_ang_vic
+    # fixed_ang_inter
+    # dist
+    # lat
+    # lon
+    # name'
+    sim_geom_psd_ul = {'vic': SimGeometry(sep_es, np.abs(elev), nad_es, zen_es, 0., 0., distance, 0., 0., "dummy"),
+                       'inter': SimGeometry(sep_es, np.abs(elev), nad_es, zen_es, 0., 0., distance, 0., 0., "dummy")}
+    sim_geom_g_t_ul = {'vic': SimGeometry(sep_es, np.abs(elev), nad_es, zen_es, 0., 0., distance, 0., 0., "dummy"),
+                       'inter': SimGeometry(sep_es, np.abs(elev), nad_es, zen_es, 0., 0., distance, 0., 0., "dummy")}
+    sim_geom_psd_dl = {'vic': SimGeometry(sep_ss, np.abs(elev), nad_ss, zen_ss, 0., 0., distance, 0., 0., "dummy"),
+                       'inter': SimGeometry(sep_ss, np.abs(elev), nad_ss, zen_ss, 0., 0., distance, 0., 0., "dummy")}
+    sim_geom_g_t_dl = {'vic': SimGeometry(sep_ss, np.abs(elev), nad_ss, zen_ss, 0., 0., distance, 0., 0., "dummy"),
+                       'inter': SimGeometry(sep_ss, np.abs(elev), nad_ss, zen_ss, 0., 0., distance, 0., 0., "dummy")}
+
+    # Hacky: Dummy list for "mode" variable present in antenna _init_ victim g_t functions is created
+    #  to make the vectorization call work properly (otherwise a single value is returned, rather
+    #  than a list.
+
+    psd_ul = vec_ul_tx(sim_geom_psd_ul)
+    g_t_ul = vec_ul_rx(sim_geom_g_t_ul, [""]*len(elev_plot))
+    psd_dl = vec_dl_tx(sim_geom_psd_dl)
+    g_t_dl = vec_dl_rx(sim_geom_g_t_dl, [""]*len(elev_plot))
+
+    # psd_ul = vec_ul_tx(np.abs(elev), sep_es, nad_es, distance)
+    # g_t_ul = vec_ul_rx(np.abs(elev), sep_es, nad_es, distance)
+    # psd_dl = vec_dl_tx(np.abs(elev), sep_ss, nad_ss, distance)
+    # g_t_dl = vec_dl_rx(np.abs(elev), sep_ss, nad_ss, distance)
 
     # Plot PSD
     plt_ax_tx.plot(elev_plot, psd_ul, label=f"psd_ul {model.AntennaModel.name}")
