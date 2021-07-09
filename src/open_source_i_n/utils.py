@@ -1,6 +1,6 @@
 from time import monotonic
 from pathlib import Path
-from os import getcwd, scandir, mkdir
+from os import getcwd, scandir, makedirs
 from re import search
 from sys import stderr, gettrace
 import tkinter
@@ -100,7 +100,7 @@ def check_folder(path):
         scandir(path)
     except FileNotFoundError:
         print("Folder %s not found. Creating new folder." % path)
-        mkdir(path)
+        makedirs(path)
 
 
 def read_config_file(file_name):
@@ -147,7 +147,7 @@ def get_setting(settings_dict, key, accepted_vals=None, is_boolean=False, option
     # Load value from settings
     try:
         output = settings_dict[key]
-    except KeyError():
+    except KeyError:
         if optional:
             return None
         print(f"No {key} specified. Please specify an {key} in settings.ini")
