@@ -5,6 +5,8 @@ from functools import wraps
 from itertools import chain, repeat
 import os
 from collections import namedtuple
+
+import numpy as np
 from numpy import arange, array, log10, pi, repeat as np_repeat, dstack, empty
 import scipy.constants as consts
 
@@ -15,10 +17,10 @@ from .interval import partition_interval_chunks
 from .satellite import Constellation, UlDlPair, VicInterPair, longest_hold
 from .antenna import BaseAntennaModel as Bam
 
-SimGeometry = namedtuple('SimGeometry', 'sep_ang elev nad_ang zen_ang fixed_ang dist')
+SimGeometry = namedtuple('SimGeometry', 'sep_ang elev nad_ang zen_ang fixed_ang_vic fixed_ang_inter dist lat lon name sat_grd_vec orb_vel_vec sat_nad_vec')
 
 
-def _timed_calc_interval(time_per_step):        # pylint: disable=unused-argument
+def _timed_calc_interval(time_per_step):  # pylint: disable=unused-argument
     """Time an InterferenceSim method that has an interval to operate on as the first argument.
 
     Args:
@@ -27,6 +29,7 @@ def _timed_calc_interval(time_per_step):        # pylint: disable=unused-argumen
     Returns:
         function: Decorator function.
     """
+
     def _timed_calc_interval_decorator(func):
         """Time a function that has an interval to operate on as the first argument.
 
@@ -36,6 +39,7 @@ def _timed_calc_interval(time_per_step):        # pylint: disable=unused-argumen
         Returns:
             function: Wrapped function.
         """
+
         @wraps(func)
         def wrapper(sim, interval, *args, **kwargs):
             sim_begin = datetime.datetime.now()
@@ -56,6 +60,7 @@ def _timed_calc_interval(time_per_step):        # pylint: disable=unused-argumen
 
 class InterferenceSim:
     """Interference simulation engine."""
+
     def __init__(self, frequency, constels, position, parallelism=0):
         """Constructor.
 
@@ -90,6 +95,7 @@ class InterferenceSim:
                 downlink I/N.
         """
 
+
         # One of the satellites not visible means no interference.
         if None in tracked:
             return empty((4, 2, 0))
@@ -108,31 +114,78 @@ class InterferenceSim:
         vic_zen_ang = zenith_point.separation_from(vic_to_grd).degrees
         inter_zen_ang = zenith_point.separation_from(inter_to_grd).degrees
 
+        # Find names of tracked satellites
+        inter_name = tracked.inter.name
+        vic_name = tracked.vic.name
+
+
+        inter_subpoint = inter_curr.subpoint()
+        vic_subpoint = vic_curr.subpoint()
+        inter_lat, inter_lon = inter_subpoint.latitude.degrees, inter_subpoint.longitude.degrees
+        vic_lat, vic_lon = vic_subpoint.latitude.degrees, vic_subpoint.longitude.degrees
+
+        # Find orbital velocity vectors
+        inter_curr = tracked.inter.at(t_curr)
+        inter_orb_vel_vec = inter_curr.velocity.km_per_s
+        vic_curr = tracked.vic.at(t_curr)
+        vic_orb_vel_vec = vic_curr.velocity.km_per_s
+
+        # Find nadir vectors
+        inter_subpoint_gs = Topos(inter_lat,inter_lon)
+        inter_nad_vec = (inter_subpoint_gs-tracked.inter).at(t_curr) # interfering nadir vector
+        vic_subpoint_gs = Topos(vic_lat,vic_lon)
+        vic_nad_vec = (vic_subpoint_gs- tracked.vic).at(t_curr) # victim nadir vector
+
+
         # If Victim ES is to be kept at a fixed azimuth/elevation, define that vector.
         if self.constellations.vic.fixed_params:
             fixed_el, fixed_az = self.constellations.vic.fixed_params
             fixed_point = groundstation.at(t_curr).from_altaz(alt_degrees=fixed_el,
                                                               az_degrees=fixed_az)
-            vic_fixed_ang = fixed_point.separation_from(vic_to_grd).degrees
-            inter_fixed_ang = fixed_point.separation_from(inter_to_grd).degrees
+            fixed_vic_es_to_vic_sat_ang = fixed_point.separation_from(vic_to_grd).degrees
+            fixed_vic_es_to_inter_sat_ang = fixed_point.separation_from(inter_to_grd).degrees
         else:
-            vic_fixed_ang = 0
-            inter_fixed_ang = 0
+            fixed_vic_es_to_vic_sat_ang = 0
+            fixed_vic_es_to_inter_sat_ang = 0
 
-            sim_geom = {'vic': SimGeometry(sep_angle,
-                                   coords.vic['el'].item(),
-                                   vic_nad_ang,
-                                   vic_zen_ang,
-                                   vic_fixed_ang,
-                                   coords.vic['r'].item()),
-                        'inter': SimGeometry(sep_angle,
-                                   coords.inter['el'].item(),
-                                   inter_nad_ang,
-                                   inter_zen_ang,
-                                   inter_fixed_ang,
-                                   coords.inter['r'].item())
-                        }
-
+        # If Inter ES is to be kept at a fixed azimuth/elevation, define that vector.
+        if self.constellations.inter.fixed_params:
+            inter_fixed_el, inter_fixed_az = self.constellations.inter.fixed_params
+            inter_fixed_point = groundstation.at(t_curr).from_altaz(alt_degrees=inter_fixed_el,
+                                                              az_degrees=inter_fixed_az)
+            fixed_inter_es_to_vic_sat_ang = inter_fixed_point.separation_from(vic_to_grd).degrees
+            fixed_inter_es_to_inter_sat_ang = inter_fixed_point.separation_from(vic_to_grd).degrees
+        else:
+            fixed_inter_es_to_vic_sat_ang = 0
+            fixed_inter_es_to_inter_sat_ang = 0
+        
+        sim_geom = {'vic': SimGeometry(sep_angle,
+                                       coords.vic['el'].item(),
+                                       vic_nad_ang,
+                                       vic_zen_ang,
+                                       fixed_vic_es_to_vic_sat_ang,
+                                       fixed_inter_es_to_vic_sat_ang,
+                                       coords.vic['r'].item(),
+                                       vic_lat,
+                                       vic_lon,
+                                       vic_name,
+                                       inter_to_grd,
+                                       inter_orb_vel_vec,
+                                       inter_nad_vec),
+                    'inter': SimGeometry(sep_angle,          
+                                         coords.inter['el'].item(),
+                                         inter_nad_ang,   
+                                         inter_zen_ang,
+                                         fixed_vic_es_to_inter_sat_ang,
+                                         fixed_inter_es_to_inter_sat_ang,
+                                         coords.inter['r'].item(),
+                                         inter_lat,
+                                         inter_lon,
+                                         inter_name,
+                                         vic_to_grd,
+                                         vic_orb_vel_vec,
+                                         vic_nad_vec)
+                    }
 
         # Other variables
         adj_factor = 0  # ITU-R BO.1696 Section 2.2.2, Z1
@@ -140,29 +193,27 @@ class InterferenceSim:
 
         # Interfering PFD in dBW/Hz for DL and UL.
         psd = array((
-					 # Interfering ES PSD into victim sat
-        			 self._inter.antenna_model.ul.es_psd(sim_geom),
-					 # Interfering satellite PSD to co-located ES's
-            		 self._inter.antenna_model.dl.sat_psd(sim_geom),
-					# Carrier ES PSD to into vic (carrier) sat
-            		self._victim.antenna_model.ul.es_psd(sim_geom),
-					# Carrier satellite PSD to co-located ES's
-            		self._victim.antenna_model.dl.sat_psd(sim_geom)
-				  ))
-
-
+            # Interfering ES PSD into victim sat
+            self._inter.antenna_model.ul.es_psd(sim_geom),
+            # Interfering satellite PSD to co-located ES's
+            self._inter.antenna_model.dl.sat_psd(sim_geom),
+            # Carrier ES PSD to into vic (carrier) sat
+            self._victim.antenna_model.ul.es_psd(sim_geom),
+            # Carrier satellite PSD to co-located ES's
+            self._victim.antenna_model.dl.sat_psd(sim_geom)
+        ))
 
         # G/T off axis for victim ground station and satellite, respectively.
         g_t = array((
-					 # Victim satellite G/T towards interfering ES signal.
-            		 self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'inter'),
-					 # Victim ES G/T towards interfering satellite signal.
-            		 self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'inter'),
-					 # Victim satellite G/T towards carrier ES signal.
-            		 self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'vic'),
-					 # Victim ES G/T towards carrier satellite signal.
-            		 self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'vic')
-        		   ))
+            # Victim satellite G/T towards interfering ES signal.
+            self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'inter'),
+            # Victim ES G/T towards interfering satellite signal.
+            self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'inter'),
+            # Victim satellite G/T towards carrier ES signal.
+            self._victim.antenna_model.ul.sat_g_over_t(sim_geom, 'vic'),
+            # Victim ES G/T towards carrier satellite signal.
+            self._victim.antenna_model.dl.es_g_over_t(sim_geom, 'vic')
+        ))
 
         # Rain fade
         inter_atmo_loss_dl = 0
@@ -198,16 +249,16 @@ class InterferenceSim:
         # + Noise power (N)
         # + Bandwidth overlap
         # - Losses
-        dl_I_N = psd_int_dl + 10*log10(inter_bw_dl) + a_eff_dl\
-            + g_t_vic_es - 10*log10(vic_bw_dl) - 10 * log10(consts.k) \
-            + inter_bw_overlap_dl \
-            - inter_atmo_loss_dl - adj_factor - rain_noise_temp
+        dl_I_N = psd_int_dl + 10 * log10(inter_bw_dl) + a_eff_dl \
+                 + g_t_vic_es - 10 * log10(vic_bw_dl) - 10 * log10(consts.k) \
+                 + inter_bw_overlap_dl \
+                 - inter_atmo_loss_dl - adj_factor - rain_noise_temp
         dl_C_N = psd_carrier_dl + + a_eff_dl \
-            + g_t_carrier_es - 10 * log10(consts.k) \
-            - vic_atmo_loss_dl - adj_factor - rain_noise_temp
+                 + g_t_carrier_es - 10 * log10(consts.k) \
+                 - vic_atmo_loss_dl - adj_factor - rain_noise_temp
         dl_C_I = dl_C_N - dl_I_N
         dl_C_I_N = -10 * log10(
-            10**(-0.1 * dl_C_N) + 10**(-0.1 * dl_C_I))  # eq 1(b) in ITU Rec. ITU-R BO.1696
+            10 ** (-0.1 * dl_C_N) + 10 ** (-0.1 * dl_C_I))  # eq 1(b) in ITU Rec. ITU-R BO.1696
 
         # Uplink C/I+N (dB)
         g_t_vic_sat = g_t[0]
@@ -215,15 +266,18 @@ class InterferenceSim:
         psd_int_ul = psd[0]
         psd_carrier_ul = psd[2]
 
-        ul_I_N = psd_int_ul + 10*log10(inter_bw_ul) + a_eff_ul\
-            + g_t_vic_sat - 10*log10(vic_bw_ul) - 10 * log10(consts.k) \
-            + inter_bw_overlap_ul \
-            - inter_atmo_loss_ul - adj_factor - rain_noise_temp
+        ul_I_N = psd_int_ul + 10 * log10(inter_bw_ul) + a_eff_ul \
+                 + g_t_vic_sat - 10 * log10(vic_bw_ul) - 10 * log10(consts.k) \
+                 + inter_bw_overlap_ul \
+                 - inter_atmo_loss_ul - adj_factor - rain_noise_temp
         ul_C_N = psd_carrier_ul + g_t_carrier_sat - 10 * log10(
             consts.k) + a_eff_ul - vic_atmo_loss_ul - adj_factor - rain_noise_temp
         ul_C_I = ul_C_N - ul_I_N
         ul_C_I_N = -10 * log10(
-            10**(-0.1 * ul_C_N) + 10**(-0.1 * ul_C_I))  # eq 1b in ITU Rec. ITU-R BO.1696
+            10 ** (-0.1 * ul_C_N) + 10 ** (-0.1 * ul_C_I))  # eq 1b in ITU Rec. ITU-R BO.1696
+
+        # FIXME Temporary: """ overwriting downlink I/N with the downlink PSD"""
+        # dl_I_N = psd_int_dl+ 10 * np.log10(1e6)
 
         # If debug is set to true, output the calculation parameters at each timestep into a link
         # budget.
@@ -413,14 +467,14 @@ class InterferenceSim:
         timescale = load.timescale(builtin=True)
         times = timescale.utc(self._epoch_start.J, second=arange(*interval, interval.step))
         groundstation = Topos(*self._position)
-        sat_coords = VicInterPair()   # Index and coordinates of tracked satellite at each timestep.
-        sat_gs_diffs = VicInterPair()   # Vector between satellites and ground station.
-        tracked = VicInterPair()        # [None/tracked sat object for each timestep].
+        sat_coords = VicInterPair()  # Index and coordinates of tracked satellite at each timestep.
+        sat_gs_diffs = VicInterPair()  # Vector between satellites and ground station.
+        tracked = VicInterPair()  # [None/tracked sat object for each timestep].
         for idx in tracked.__fields__:  # Just need VicInterPair indices.
             sats = self.constellations[idx].sats  # Temporary alias.
             sat_gs_diffs[idx] = sats - np_repeat(groundstation, len(sats))
             sat_coords[idx] = self.constellations[idx].get_sat_coords(self._position, times,
-                                                                      longest_holds_list[idx])
+                                                                          longest_holds_list[idx])
             tracked[idx] = [None if row is None else sats[row['idx']] for row in sat_coords[idx]]
 
         # Calculate C/I+N, I/N, C/N, and C/I by mapping to the _calculate_interference method.
