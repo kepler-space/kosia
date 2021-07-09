@@ -196,7 +196,10 @@ class Config:
         if not direct:
             self.duration = float(args['duration'])
             self.sim_block_size = ceil(float(args['sim_block_size']) * DAY_S)
-            self.granularity = 1
+            if 'granularity' in args.keys():
+                self.granularity = int(args['granularity'])
+            else:
+                self.granularity = 1
             self.save_data = args['save_data']
             self.no_save_data = None
             # pylint: disable=C0103
@@ -209,6 +212,7 @@ class Config:
             self.vic_geo_angle = float(args['vic_geo_angle'])
             self.vic_tracking_strat = Constellation.TrackingStrategy(args['vic_tracking_strat'])
             self.vic_module = antenna.load(args['vic_module'])
+            self.vic_const_name = args['vic_const_name']
             self.vic_opt_args = None
 
             self.inter_tle_file = args['inter_tle_file']
@@ -223,6 +227,11 @@ class Config:
                 self.vic_fixed_params = tuple(map(float, args['vic_fixed_params'].split(',')))
             except KeyError:
                 self.vic_fixed_params = ""
+
+            try:
+                self.inter_fixed_params = tuple(map(float, args['inter_fixed_params'].split(',')))
+            except KeyError:
+                self.inter_fixed_params = ""
 
             try:
                 self.parallel = int(args['parallel'])
@@ -254,6 +263,7 @@ class Config:
             self.vic_geo_angle = args['vic_geo_angle']
             self.vic_tracking_strat = args['vic_tracking_strat']
             self.vic_module = args['vic_module']
+            self.vic_const_name = args['vic_const_name']
             self.vic_opt_args = args['vic_opt_args']
 
             self.inter_tle_file = args['inter_tle_file']
@@ -268,6 +278,11 @@ class Config:
                 self.vic_fixed_params = args['vic_fixed_params']
             except KeyError:
                 self.vic_fixed_params = ""
+
+            try:
+                self.inter_fixed_params = args['inter_fixed_params']
+            except KeyError:
+                self.inter_fixed_params = ""
 
             if args['parallel']:
                 self.parallel = args['parallel']
@@ -326,6 +341,7 @@ class Config:
             f'{start_char}--inter_tracking_strat "{self.inter_tracking_strat.value}"{end_char}' \
             f'{start_char}--inter_module "{self.inter_module.__name__.split(".")[-1]}"{end_char}' \
             f'{start_char}--inter_const_name "{self.inter_const_name}"{end_char}' \
+            f'{start_char}--inter_fixed_params "{self.inter_fixed_params}"{end_char}' \
             f'{start_char}--parallel {self.parallel}{end_char}' \
             f'{start_char}--name "{self.name}"'
 
