@@ -95,7 +95,6 @@ class AntennaModel(BaseAntennaModel):
     props = AntennaProperties(**__SAT_PROPERTIES[default_sat], **__ES_PROPERTIES[default_es])
 
     interfering_sat_dl_psd = BaseAntennaModel.interfering_sat_dl_psd_s1528(props.sat_gain_dl,
-                                                                           props.sat_diam_dl,
                                                                            props.sat_power_db,
                                                                            props.sat_bw_hz_dl,
                                                                            props.sat_hpbw_dl,
@@ -109,4 +108,4 @@ class AntennaModel(BaseAntennaModel):
         props.es_gain_dl, props.es_temp_sys, props.es_losses_dl)
 
     victim_sat_ul_g_over_t = BaseAntennaModel.victim_sat_ul_g_over_t_s1528(
-        props.sat_gain_ul, props.sat_diam_ul, props.sat_temp_sys, props.sat_hpbw_ul)
+        props.sat_gain_ul, props.sat_temp_sys, props.sat_hpbw_ul)
